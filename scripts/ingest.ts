@@ -4,11 +4,11 @@
  *
  * 使い方: node scripts/ingest.ts <URL かファイルのパス> [--slug <名前>] [--force]
  * 終了コード: 0 は成功、1 は失敗、2 は同じ slug のフォルダーがすでにある（--force で作り直すか、--slug で別の名前にする）、
- * 3 は slug がビルドで使えない名前（index と 404）になった（--slug で別の名前にする）
+ * 3 は slug がビルドで使えない名前（index と 404）になったか、--slug の値に使えない文字がある（--slug で別の名前にする）
  */
 // 画像は 1 枚ずつ順に取る。番号を記事の中の順に付けるのと、記事のサーバーに同時に何本も要求を送らないため
 /* oxlint-disable no-await-in-loop */
-import { copyFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -19,6 +19,7 @@ import { findContentRoot, htmlToMarkdown, parseHtml, readMeta } from './ingest/h
 
 export class SlugExistsError extends Error {}
 export class ReservedSlugError extends Error {}
+export class InvalidSlugError extends Error {}
 
 export const sanitizeSlug = (text: string): string =>
 	text
@@ -39,21 +40,38 @@ export const slugFromInput = (input: string): string => {
 const IMAGE_IMPORT = /^(import\s+\w+\s+from\s+['"])([^'"]+\.(?:png|jpe?g|gif|webp|avif|svg))(['"])/gm
 const IMAGE_LINK = /(!\[[^\]]*\]\()([^)\s]+)(\))/g
 
+// 本文の文字列をまとめて置き換えると、一方の参照が他方の一部になる組（./a.png と ../a.png）で、後の参照が壊れる。
+// 画像の構文の中の URL だけを、元の参照ごとに置き換える
+const replaceImageSpecs = (markdown: string, targets: ReadonlyMap<string, string>): string => {
+	const replace = (match: string, head: string, spec: string, tail: string): string => {
+		const target = targets.get(spec)
+		return target === undefined ? match : `${head}${target}${tail}`
+	}
+	return markdown.replace(IMAGE_IMPORT, replace).replace(IMAGE_LINK, replace)
+}
+
 const quote = (value: string): string => JSON.stringify(value)
 
+type Fields = Record<string, string | undefined>
+
+const definedEntries = (fields: Fields): [string, string][] =>
+	Object.entries(fields).filter((entry): entry is [string, string] => entry[1] !== undefined)
+
+const frontmatterLines = (entries: [string, string][]): string[] =>
+	entries.map(([key, value]) => `${key}: ${quote(value)}`)
+
 // 既存の frontmatter に、取り込みの情報（出典の URL など）を足す。すでにある鍵は上書きしない
-const withFrontmatter = (markdown: string, fields: Record<string, string | undefined>): string => {
-	const entries = Object.entries(fields).filter((entry): entry is [string, string] => entry[1] !== undefined)
+const withFrontmatter = (markdown: string, fields: Fields): string => {
 	const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(markdown)
 	const existing = match?.[1] ?? ''
-	const added = entries
-		.filter(([key]) => !new RegExp(`^${key}:`, 'm').test(existing))
-		.map(([key, value]) => `${key}: ${quote(value)}`)
+	const added = frontmatterLines(definedEntries(fields).filter(([key]) => !new RegExp(`^${key}:`, 'm').test(existing)))
 	if (match === null) return `---\n${added.join('\n')}\n---\n\n${markdown}`
 	return `---\n${[existing, ...added].filter((line) => line !== '').join('\n')}\n---\n${markdown.slice(match[0].length)}`
 }
 
-type Result = { dir: string; via: 'html' | 'taklog' | 'file'; images: number; failedImages: string[] }
+type Via = 'html' | 'taklog' | 'file'
+
+type Result = { dir: string; via: Via; images: number; failedImages: string[] }
 
 type Options = {
 	input: string
@@ -64,37 +82,36 @@ type Options = {
 	fetch?: typeof fetch | undefined
 }
 
+// path は取り込み先のフォルダーからの相対のパス（./images/01-a.png）
+type ImageFile = { path: string; data: Uint8Array }
+
+type Prepared = { via: Via; markdown: string; files: ImageFile[]; failed: string[] }
+
 /**
- * ローカルのマークダウンを写す。画像（MDX の import と ![](...) のうち、ローカルのもの）は images/ に写し、参照を書き換える。
+ * ローカルのマークダウンを読む。画像（MDX の import と ![](...) のうち、ローカルのもの）は中身を読んでおき、参照を images/ に書き換える。
  * `@/` は taklog の別名で、src/ を指す
  */
-const ingestMarkdownFile = async (
-	file: string,
-	dir: string,
-	fields: Record<string, string | undefined>,
-	srcDir?: string,
-): Promise<{ markdown: string; images: number; failed: string[] }> => {
-	let markdown = await readFile(file, 'utf8')
+const readMarkdownFile = async (file: string, fields: Fields, srcDir?: string): Promise<Omit<Prepared, 'via'>> => {
+	const markdown = await readFile(file, 'utf8')
 	const specs = new Set<string>()
 	for (const match of markdown.matchAll(IMAGE_IMPORT)) if (match[2] !== undefined) specs.add(match[2])
 	for (const match of markdown.matchAll(IMAGE_LINK))
 		if (match[2] !== undefined && !/^(?:https?:|data:)/.test(match[2])) specs.add(match[2])
 	const failed: string[] = []
-	let count = 0
+	const files: ImageFile[] = []
+	const targets = new Map<string, string>()
 	for (const spec of specs) {
 		const path =
 			spec.startsWith('@/') && srcDir !== undefined ? join(srcDir, spec.slice(2)) : resolve(dirname(file), spec)
-		const target = `./images/${String(count + 1).padStart(2, '0')}-${basename(path)}`
+		const target = `./images/${String(files.length + 1).padStart(2, '0')}-${basename(path)}`
 		try {
-			await mkdir(join(dir, 'images'), { recursive: true })
-			await copyFile(path, join(dir, target))
-			markdown = markdown.replaceAll(spec, target)
-			count += 1
+			files.push({ path: target, data: await readFile(path) })
+			targets.set(spec, target)
 		} catch {
 			failed.push(spec)
 		}
 	}
-	return { markdown: withFrontmatter(markdown, fields), images: count, failed }
+	return { markdown: withFrontmatter(replaceImageSpecs(markdown, targets), fields), files, failed }
 }
 
 const CONTENT_TYPE_EXTENSIONS: Record<string, string> = {
@@ -106,62 +123,38 @@ const CONTENT_TYPE_EXTENSIONS: Record<string, string> = {
 	'image/svg+xml': '.svg',
 }
 
-export const ingest = async (options: Options): Promise<Result> => {
-	const { input, slidesDir } = options
-	const fetcher = options.fetch ?? fetch
-	const isUrl = /^https?:\/\//.test(input)
-	const slug = options.slug ?? slugFromInput(input)
-	if (slug === '') throw new Error('slug を作れませんでした。--slug で名前を指定してください')
-	// 使えない slug は、取り込んでもビルドで止まる。規則をビルドとそろえるため、判定は inline-decks.ts のものを使う
-	try {
-		assertSlug(slug)
-	} catch (error) {
-		throw new ReservedSlugError(
-			`${error instanceof Error ? error.message : String(error)}。--slug で別の名前を指定してください`,
-		)
-	}
-	const dir = join(slidesDir, slug)
-	const exists = await stat(dir).then(
+const exists = async (path: string): Promise<boolean> =>
+	stat(path).then(
 		() => true,
 		() => false,
 	)
-	if (exists && options.force !== true)
-		throw new SlugExistsError(`${dir} はすでにあります。--force で作り直すか、--slug で別の名前にしてください`)
-	// 作り直すときは、取り込んだものだけを消す。原稿（deck.mdx）は残し、スキルの側で書き直す
-	await rm(join(dir, 'source.md'), { force: true })
-	await rm(join(dir, 'images'), { recursive: true, force: true })
-	await mkdir(dir, { recursive: true })
+
+const prepare = async (
+	input: string,
+	isUrl: boolean,
+	taklogDirOption: string | undefined,
+	fetcher: typeof fetch,
+): Promise<Prepared> => {
 	const ingested = new Date().toISOString().slice(0, 10)
 
-	if (!isUrl) {
-		if (!['.md', '.mdx'].includes(extname(input))) throw new Error('ファイルは .md か .mdx にしてください')
-		const result = await ingestMarkdownFile(resolve(input), dir, { ingested, via: 'file' })
-		await writeFile(join(dir, 'source.md'), result.markdown)
-		return { dir, via: 'file', images: result.images, failedImages: result.failed }
-	}
+	if (!isUrl) return { via: 'file', ...(await readMarkdownFile(resolve(input), { ingested, via: 'file' })) }
 
 	const url = new URL(input)
 	// ユーザーのブログの記事は、公開された HTML より情報の多い元の MDX（コードの言語、画像の元のファイル）を読む
-	const taklogDir = options.taklogDir ?? process.env['TAKLOG_DIR'] ?? join(homedir(), 'dev', 'taklog')
+	const taklogDir = taklogDirOption ?? process.env['TAKLOG_DIR'] ?? join(homedir(), 'dev', 'taklog')
 	const taklogSlug = /^\/article\/([^/]+)\/?$/.exec(url.pathname)?.[1]
 	if (/^(?:www\.)?tak-dcxi\.com$/.test(url.hostname) && taklogSlug !== undefined) {
 		const file = join(taklogDir, 'src', 'content', 'article', `${taklogSlug}.mdx`)
-		const found = await stat(file).then(
-			() => true,
-			() => false,
-		)
-		if (found) {
+		if (await exists(file)) {
 			// 著者名はサイトの設定の alias を使う（taklog は本名を About のページでだけ出す）
 			const site = await readFile(join(taklogDir, 'src', 'lib', 'site.ts'), 'utf8').catch(() => '')
 			const author = /alias:\s*'([^']+)'/.exec(site)?.[1]
-			const result = await ingestMarkdownFile(
+			const result = await readMarkdownFile(
 				file,
-				dir,
 				{ author, url: url.href, ingested, via: 'taklog' },
 				join(taklogDir, 'src'),
 			)
-			await writeFile(join(dir, 'source.md'), result.markdown)
-			return { dir, via: 'taklog', images: result.images, failedImages: result.failed }
+			return { via: 'taklog', ...result }
 		}
 	}
 
@@ -172,7 +165,7 @@ export const ingest = async (options: Options): Promise<Result> => {
 	const converted = htmlToMarkdown(findContentRoot(doc), response.url === '' ? url.href : response.url)
 	let markdown = converted.markdown
 	const failed: string[] = []
-	let saved = 0
+	const files: ImageFile[] = []
 	for (const image of converted.images) {
 		try {
 			const imageResponse = await fetcher(image.url)
@@ -185,9 +178,7 @@ export const ingest = async (options: Options): Promise<Result> => {
 				path = path.replace(/\.[a-z0-9]+$/i, extension)
 				markdown = markdown.replaceAll(`](${image.path})`, `](${path})`)
 			}
-			await mkdir(join(dir, 'images'), { recursive: true })
-			await writeFile(join(dir, path), new Uint8Array(await imageResponse.arrayBuffer()))
-			saved += 1
+			files.push({ path, data: new Uint8Array(await imageResponse.arrayBuffer()) })
 		} catch {
 			// 取れなかった画像は元の URL に戻し、記事の中の位置を残す
 			markdown = markdown.replaceAll(`](${image.path})`, `](${image.url})`)
@@ -202,8 +193,54 @@ export const ingest = async (options: Options): Promise<Result> => {
 		ingested,
 		via: 'html',
 	}
-	await writeFile(join(dir, 'source.md'), withFrontmatter(`${markdown}\n`, fields))
-	return { dir, via: 'html', images: saved, failedImages: failed }
+	// HTML から作った本文に frontmatter はない。本文が ---（記事の先頭の <hr>）で始まっても frontmatter として読まないよう、
+	// 本文を調べずに先頭に付ける
+	return {
+		via: 'html',
+		markdown: `---\n${frontmatterLines(definedEntries(fields)).join('\n')}\n---\n\n${markdown}\n`,
+		files,
+		failed,
+	}
+}
+
+export const ingest = async (options: Options): Promise<Result> => {
+	const { input, slidesDir } = options
+	const fetcher = options.fetch ?? fetch
+	const isUrl = /^https?:\/\//.test(input)
+	const slug = options.slug ?? slugFromInput(input)
+	if (options.slug === undefined && slug === '')
+		throw new Error('slug を作れませんでした。--slug で名前を指定してください')
+	// 使えない slug は、取り込んでもビルドで止まる。規則をビルドとそろえるため、判定は inline-decks.ts のものを使う
+	try {
+		assertSlug(slug)
+	} catch (error) {
+		throw new ReservedSlugError(
+			`${error instanceof Error ? error.message : String(error)}。--slug で別の名前を指定してください`,
+		)
+	}
+	// slug はフォルダーの名前、ページの URL、dist のファイル名になる。--slug の値も、記事から作る slug と同じ形に限る。
+	// 勝手に直すと、指定した名前と違うフォルダーができるので、直さずに止める
+	if (slug === '' || slug !== sanitizeSlug(slug))
+		throw new InvalidSlugError(
+			`--slug の値「${slug}」は使えません。英小文字（a-z）と数字（0-9）を、ハイフン（-）1 つで区切って指定してください（例: my-talk-2026）`,
+		)
+	if (!isUrl && !['.md', '.mdx'].includes(extname(input))) throw new Error('ファイルは .md か .mdx にしてください')
+	const dir = join(slidesDir, slug)
+	if ((await exists(dir)) && options.force !== true)
+		throw new SlugExistsError(`${dir} はすでにあります。--force で作り直すか、--slug で別の名前にしてください`)
+
+	const prepared = await prepare(input, isUrl, options.taklogDir, fetcher)
+
+	// 消すのと書くのは、本文と画像をすべて読めた後に行う。取得や読み込みに失敗したときに、空のフォルダー（やり直すと
+	// SlugExistsError になる）や、前回の取り込みを消した跡を残さないため
+	// 作り直すときは、取り込んだものだけを消す。原稿（deck.mdx）は残し、スキルの側で書き直す
+	await rm(join(dir, 'source.md'), { force: true })
+	await rm(join(dir, 'images'), { recursive: true, force: true })
+	await mkdir(dir, { recursive: true })
+	if (prepared.files.length > 0) await mkdir(join(dir, 'images'), { recursive: true })
+	for (const file of prepared.files) await writeFile(join(dir, file.path), file.data)
+	await writeFile(join(dir, 'source.md'), prepared.markdown)
+	return { dir, via: prepared.via, images: prepared.files.length, failedImages: prepared.failed }
 }
 
 if (import.meta.main) {
@@ -224,6 +261,11 @@ if (import.meta.main) {
 		for (const failed of result.failedImages) console.warn(`画像を取れませんでした: ${failed}`)
 	} catch (error) {
 		console.error(error instanceof Error ? error.message : error)
-		process.exitCode = error instanceof SlugExistsError ? 2 : error instanceof ReservedSlugError ? 3 : 1
+		process.exitCode =
+			error instanceof SlugExistsError
+				? 2
+				: error instanceof ReservedSlugError || error instanceof InvalidSlugError
+					? 3
+					: 1
 	}
 }

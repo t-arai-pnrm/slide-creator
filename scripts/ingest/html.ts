@@ -104,13 +104,17 @@ const NAMED_ENTITIES: Record<string, string> = {
 	zwnj: '‌',
 }
 
+// 表を添字で引くと、&constructor; や &toString; が Object.prototype の関数に当たる。表に書いた名前だけを使う
+const namedEntity = (name: string): string | undefined =>
+	Object.hasOwn(NAMED_ENTITIES, name) ? NAMED_ENTITIES[name] : undefined
+
 export const decodeEntities = (text: string): string =>
 	text.replace(/&(#x[0-9a-f]+|#\d+|[a-z][a-z0-9]*);/gi, (match, name: string) => {
 		if (name.startsWith('#')) {
 			const code = name[1] === 'x' || name[1] === 'X' ? Number.parseInt(name.slice(2), 16) : Number(name.slice(1))
 			return Number.isInteger(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : match
 		}
-		return NAMED_ENTITIES[name] ?? NAMED_ENTITIES[name.toLowerCase()] ?? match
+		return namedEntity(name) ?? namedEntity(name.toLowerCase()) ?? match
 	})
 
 const element = (tag: string, attrs: Record<string, string> = {}): HtmlElement => ({
