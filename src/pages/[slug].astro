@@ -1,0 +1,37 @@
+---
+/**
+ * スライドの原稿（slides/<slug>/deck.mdx）を、/<slug>/ のページにする。
+ * 原稿は frontmatter の title と <Slide> だけを書く。Deck で包むのと Slide を渡すのはここで行い、
+ * ページ番号と全体の枚数はビルドのときに Vite のプラグイン（scripts/vite-plugin-slide-numbers.ts）が足す
+ */
+import type { GetStaticPaths, MDXInstance } from 'astro'
+import Slide from '@/components/Slide.astro'
+import Deck from '@/layouts/Deck.astro'
+
+type DeckFrontmatter = { title: string }
+
+export const getStaticPaths = (() => {
+	const decks = import.meta.glob<MDXInstance<DeckFrontmatter>>('/slides/*/deck.mdx', { eager: true })
+	return Object.entries(decks).map(([path, deck]) => {
+		// frontmatter は型のとおりとは限らない。title がないと <title> が空のページになるので、ビルドで止める
+		const title: unknown = deck.frontmatter.title
+		if (typeof title !== 'string' || title.trim() === '')
+			throw new Error(`${path}: frontmatter に title（空でない文字列）を書く`)
+		return {
+			params: { slug: path.split('/').at(-2) },
+			props: { deck },
+		}
+	})
+}) satisfies GetStaticPaths
+
+interface Props {
+	deck: MDXInstance<DeckFrontmatter>
+}
+
+const { deck } = Astro.props
+const { Content } = deck
+---
+
+<Deck title={deck.frontmatter.title}>
+	<Content components={{ Slide }} />
+</Deck>

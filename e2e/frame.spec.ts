@@ -9,9 +9,12 @@ const TOLERANCE_PX = 1
 // DESIGN.md の本文の下限（枠の幅の 2.5%）
 const BODY_MIN_RATIO = 0.025
 
+// 見本のデッキ（slides/sample/deck.mdx）のページ
+const DECK_URL = '/sample/'
+
 const frames = (page: Page) => page.locator('.slide ._frame')
 const notes = (page: Page) => page.locator('.slide ._notes')
-// src/pages/index.astro の見本のデッキは、最後の 1 枚にノートを書かない（ほかにもノートのないスライドがある）
+// 見本のデッキ（slides/sample/deck.mdx）は、最後の 1 枚にノートを書かない（ほかにもノートのないスライドがある）
 const slideWithoutNotes = (page: Page) => page.locator('section.slide').last()
 
 // 画面の幅と高さは、スクロールバーを除いた表示領域で測る。スクロールバーの下に枠が隠れると、収まっていないため
@@ -42,7 +45,7 @@ for (const viewport of LANDSCAPE_VIEWPORTS) {
 		test.use({ viewport })
 
 		test('各スライドの枠が 16:9 で、画面に収まる', async ({ page }) => {
-			await page.goto('/')
+			await page.goto(DECK_URL)
 			const screen = await getViewportSize(page)
 			const sizes = await getFrameSizes(page)
 			expect(sizes.length).toBeGreaterThan(0)
@@ -54,7 +57,7 @@ for (const viewport of LANDSCAPE_VIEWPORTS) {
 		})
 
 		test('スピーカーノートが見えていない', async ({ page }) => {
-			await page.goto('/')
+			await page.goto(DECK_URL)
 			const all = await notes(page).all()
 			expect(all.length).toBeGreaterThan(0)
 			await Promise.all(all.map((note) => expect(note).toBeHidden()))
@@ -66,7 +69,7 @@ test.describe('縦長の画面（375×812）', () => {
 	test.use({ viewport: { width: 375, height: 812 } })
 
 	test('枠の幅が画面の幅と同じで、16:9 になる', async ({ page }) => {
-		await page.goto('/')
+		await page.goto(DECK_URL)
 		const screen = await getViewportSize(page)
 		const sizes = await getFrameSizes(page)
 		expect(sizes.length).toBeGreaterThan(0)
@@ -77,7 +80,7 @@ test.describe('縦長の画面（375×812）', () => {
 	})
 
 	test('スピーカーノートが見えている', async ({ page }) => {
-		await page.goto('/')
+		await page.goto(DECK_URL)
 		const all = await notes(page).all()
 		expect(all.length).toBeGreaterThan(0)
 		await Promise.all(all.map((note) => expect(note).toBeVisible()))
@@ -85,7 +88,7 @@ test.describe('縦長の画面（375×812）', () => {
 })
 
 test('本文の段落の文字が、枠の幅の 2.5% 以上の大きさになる', async ({ page }) => {
-	await page.goto('/')
+	await page.goto(DECK_URL)
 	const results = await frames(page).evaluateAll((elements) =>
 		elements
 			.filter((frame) => frame.checkVisibility())
@@ -107,7 +110,7 @@ test('本文の段落の文字が、枠の幅の 2.5% 以上の大きさにな�
 // 発表の表示では、隠れたスライドが読み上げの対象から外れるので、すべてのスライドが並ぶ縦長の画面で試す
 test('文書に h1 が 1 つあり、各スライドが h2 の題名で名前付けされている', async ({ page }) => {
 	await page.setViewportSize({ width: 375, height: 812 })
-	await page.goto('/')
+	await page.goto(DECK_URL)
 	await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1)
 
 	const slides = await page.locator('section.slide').all()
@@ -136,7 +139,7 @@ for (const { name, viewport } of NOTES_VIEWPORTS) {
 		test.use({ viewport })
 
 		test('ノートのないスライドには ._notes がなく、ほかのノートには中身がある', async ({ page }) => {
-			await page.goto('/')
+			await page.goto(DECK_URL)
 			await expect(slideWithoutNotes(page).locator('._notes')).toHaveCount(0)
 
 			const texts = await notes(page).allTextContents()
@@ -153,7 +156,7 @@ test.describe('縦長の画面でのノートの名前', () => {
 	test.use({ viewport: { width: 375, height: 812 } })
 
 	test('ノートのランドマークの名前に、ページ番号が入る', async ({ page }) => {
-		await page.goto('/')
+		await page.goto(DECK_URL)
 		const slides = await page.locator('section.slide').all()
 		const total = slides.length
 		await Promise.all(
@@ -180,7 +183,7 @@ const getBackgroundColors = (page: Page) =>
 	})
 
 test('明暗のトークンが効き、color-scheme の meta を dark only にすると背景の色が変わる', async ({ page }) => {
-	await page.goto('/')
+	await page.goto(DECK_URL)
 	const light = await getBackgroundColors(page)
 	expect(TRANSPARENT).not.toContain(light.root)
 	expect(TRANSPARENT).not.toContain(light.frame)
@@ -198,6 +201,6 @@ test('明暗のトークンが効き、color-scheme の meta を dark only に�
 })
 
 test('文書の題名がデッキの題名になる', async ({ page }) => {
-	await page.goto('/')
+	await page.goto(DECK_URL)
 	await expect(page).toHaveTitle('slide-creator の紹介')
 })

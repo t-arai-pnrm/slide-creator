@@ -5,7 +5,7 @@ import { expect, test, type Page } from '@playwright/test'
 
 // 位置と大きさはサブピクセルで丸められるので、1px の誤差を許す
 const TOLERANCE_PX = 1
-const DECKS = ['/', '/demo/']
+const DECKS = ['/sample/', '/demo/']
 const VIEWPORTS = [
 	{ width: 1280, height: 720 },
 	{ width: 1920, height: 1080 },

@@ -28,9 +28,9 @@ pnpm install
 pnpm dev
 ```
 
-表示された URL を開きます。見本のデッキは 2 本あります。
+表示された URL を開くと、デッキの一覧が出ます。見本のデッキは 2 本あります。
 
-- `/`: このツールの紹介
+- `/sample/`: このツールの紹介
 - `/demo/`: 記事から作ったデッキの例
 
 ## 発表の操作
@@ -71,20 +71,20 @@ URL の末尾の `#3` は、今のスライドの番号です。番号を付け�
 
 ## デッキの書き方
 
-今は、デッキを `src/pages/` に Astro のファイルで書きます。見本の `src/pages/demo.astro` を写して始めると早いです。
+デッキは、`slides/<名前>/deck.mdx` に MDX で書きます。見本の `slides/demo/deck.mdx` を写して始めると早いです。`<名前>` がページの URL（`/<名前>/`）と、ビルドした HTML の名前（`dist/<名前>.html`）になります。
 
-- デッキ全体を `Deck` で包み、1 枚ずつ `Slide` を並べる。`Slide` には、ページ番号（`page`）と全体の枚数（`total`）を渡す
-- 題名は `slot="title"`、ノートは `slot="notes"` の要素に書く
+- frontmatter の `title` にデッキの題名を書き、1 枚ずつ `<Slide>` を並べる。ページ番号と枚数は、ビルドのときに数えて足されるので書かない
+- 題名は `slot="title"`、ノートは `slot="notes"` の要素に書く。ノートの `<p slot="notes">` は 1 行で書く
 - 表紙や章の扉などは `layout` で選ぶ。使えるレイアウトと、1 枚に入れてよい量は、DESIGN.md の「レイアウト」にある
 
-ファイルの名前が URL になります（`src/pages/talk.astro` なら `/talk/`）。
+書き方の細かい決まりは、AGENTS.md の「スライドの原稿の書き方」にあります。
 
 ## 検査
 
 | コマンド | 内容 |
 | --- | --- |
-| `pnpm test` | 型、リンター（Oxlint、Stylelint、markuplint）、整形の検査。プッシュの前に自動で動く |
-| `pnpm build` | `dist/` にビルドする |
+| `pnpm test` | 型、リンター（Oxlint、Stylelint、markuplint）、整形、`scripts/` の単体のテスト。プッシュの前に自動で動く |
+| `pnpm build` | `dist/` にビルドし、デッキごとに、書体や CSS を埋め込んだ 1 つの HTML（`dist/<名前>.html`）を作る。配るのはこのファイル |
 | `pnpm test:html` | ビルドした HTML を検査する（先に `pnpm build`） |
 | `pnpm test:e2e` | Chromium、Firefox、WebKit で動きと見た目を試す（先に `pnpm build`） |
 | `pnpm verify` | 上の 4 つを順に実行する。PR の前に使う |
