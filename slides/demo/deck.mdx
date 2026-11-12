@@ -89,7 +89,7 @@ export const flagCode = flagLines.map(([text, mark]) => (mark ? `<span class="-m
 		<figcaption class="code-label">CSS</figcaption>
 		<pre class="code-block" set:html={flagCode} />
 	</figure>
-	<p slot="notes">子孫の側のコードです。題の文字は、狭い幅の見た目をクエリなしで書き、広い幅の見た目だけをstyle()の中に書きます。印を付けた行が、フラグを読んでいるところで、ここには閾値が出てきません。名前を付けない@containerstyle()は、親の要素を問い合わせます。カスタムプロパティは継承されるので、祖先で立てたフラグもここで読めます。</p>
+	<p slot="notes">子孫の側のコードです。題の文字は、狭い幅の見た目をクエリなしで書き、広い幅の見た目だけをstyle()の中に書きます。印を付けた行が、フラグを読んでいるところで、ここには閾値が出てきません。名前を付けない@container style()は、親の要素を問い合わせます。カスタムプロパティは継承されるので、祖先で立てたフラグもここで読めます。</p>
 </Slide>
 
 <Slide chapter="02 — Mechanism">
