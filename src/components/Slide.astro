@@ -13,9 +13,11 @@ interface Props {
 	total: number
 	/** 章のラベル。枠線の左上の角に、題名の上に置く */
 	chapter?: string | undefined
+	/** レイアウト。cover は表紙、section は章の扉、statement は主張（題名をキーメッセージとして大きく出す） */
+	layout?: 'cover' | 'section' | 'statement' | undefined
 }
 
-const { page, total, chapter } = Astro.props
+const { page, total, chapter, layout } = Astro.props
 
 // section を題名で名前付けする（aria-labelledby）には、題名の要素に id が要る。
 // 原稿の側で id を書かせると付け忘れや重なりが起きるので、題名は名前付きの slot で受け、h2 はこのコンポーネントが出す
@@ -26,7 +28,7 @@ const hasNotes = Astro.slots.has('notes')
 const notesLabel = `スピーカーノート（${page} / ${total}）`
 ---
 
-<section class="slide" aria-labelledby={titleId}>
+<section class="slide" aria-labelledby={titleId} data-layout={layout}>
 	<div class="_frame">
 		<div class="_frame-inner">
 			<hgroup class="_heading">
@@ -207,6 +209,68 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			font-size: var(--text--title--font-size);
 			font-weight: var(--text--title--font-weight);
 			line-height: var(--text--title--leading);
+
+			/* 表紙、章の扉、主張は display のスタイルにする（DESIGN.md の「レイアウトの一覧」） */
+			&:is(.slide:is([data-layout='cover'], [data-layout='section'], [data-layout='statement']) *) {
+				font-size: var(--text--display--font-size);
+				line-height: var(--text--display--leading);
+			}
+		}
+
+		/* ふつうのスライドは、題名の下に細い線を引いて、本文と分ける */
+		.slide:not([data-layout]) ._heading {
+			padding-block-end: var(--spacing--sm);
+			border-block-end: var(--line-width--thin) solid var(--border--base);
+		}
+
+		/* 表紙と章の扉は、題名を枠の下寄りに置き、上を空ける */
+		.slide:is([data-layout='cover'], [data-layout='section']) ._frame-inner {
+			reading-flow: grid-rows;
+			grid-template:
+				'.' 1fr
+				'--heading' auto
+				'--body' auto
+				'--page' auto
+				/ 1fr;
+		}
+
+		/* 表紙は、題名の上にアクセントの太い線を引く */
+		.slide[data-layout='cover'] ._heading {
+			max-inline-size: 75cqi;
+			padding-block-start: var(--spacing--md);
+			border-block-start: var(--line-width--thick) solid var(--accent--base);
+		}
+
+		/* 章の扉は、章の番号を大きな数字にする */
+		.slide[data-layout='section'] ._chapter {
+			color: var(--foreground--base);
+			font-family: var(--text--number--font-family);
+			font-size: var(--text--number--font-size);
+			font-weight: var(--text--number--font-weight);
+			line-height: var(--text--number--leading);
+			letter-spacing: var(--text--number--tracking);
+			text-transform: none;
+		}
+
+		.slide[data-layout='section'] ._heading {
+			padding-block-end: var(--spacing--sm);
+			border-block-end: var(--line-width--thick) solid var(--border--strong);
+		}
+
+		/* 主張は、キーメッセージを枠の中ほどに置き、補足を下に小さく添える */
+		.slide[data-layout='statement'] ._frame-inner {
+			reading-flow: grid-rows;
+			grid-template:
+				'.' 1fr
+				'--heading' auto
+				'--body' auto
+				'.' 1fr
+				'--page' auto
+				/ 1fr;
+		}
+
+		.slide[data-layout='statement'] ._body {
+			max-inline-size: 70cqi;
 		}
 
 		._body {

@@ -98,9 +98,10 @@ const { title } = Astro.props
 				 * 下からの位置を % で書くと画面の高さの測り方が枠（svb）と変わるので、
 				 * 上から下の辺までの位置に置き、操作の部分の高さの分だけ上へ戻す
 				 */
-				inset-block-start: calc((var(--_stage-block-size) + var(--_frame-block-size)) / 2);
+
+				/* 枠の右上の角に置く。右下にはスライドのページ番号があり、重なるため */
+				inset-block-start: calc((var(--_stage-block-size) - var(--_frame-block-size)) / 2);
 				inset-inline-end: calc((100% - var(--_frame-inline-size)) / 2);
-				translate: 0 -100%;
 			}
 
 			&:has(> .deck[data-view='present'][data-notes='shown']) > :global(.deck-controls) {

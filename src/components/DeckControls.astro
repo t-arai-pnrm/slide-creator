@@ -16,7 +16,8 @@
 
 <section class="deck-controls" aria-label="発表の操作" hidden>
 	<!-- 移動したときに、今の位置を読み上げる -->
-	<p class="_position" aria-live="polite">
+	<!-- 画面では枠の右下のページ番号と重複するので、読み上げのためだけに残す -->
+	<p class="_position | -visually-hidden" aria-live="polite">
 		<span class="-visually-hidden">スライド</span>
 		<span class="_current" data-deck-current>1</span> / <span class="_total" data-deck-total></span>
 	</p>
@@ -119,6 +120,12 @@
 		._position {
 			/* 等幅の書体を読み込めず、和文の書体の数字で出たときにも、数が変わるたびに幅が揺れないようにする */
 			font-variant-numeric: tabular-nums;
+		}
+
+		/* ラベルとキーが続いて読めないよう、間を空けて弱める */
+		._key {
+			margin-inline-start: 0.375rem;
+			opacity: 0.7;
 		}
 
 		/*
