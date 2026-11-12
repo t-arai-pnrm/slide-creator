@@ -1,15 +1,18 @@
 // 各デッキの各スライドで、中身が枠に収まっているかを確かめる（pnpm check:decks。pnpm test:e2e にも入る）。
 // DESIGN.md の「書体」のとおり、Noto Sans JP が読み込めないと OS の書体で出て幅が変わるので、
 // 枠の内側（枠線の内側）の 95% を超えたら失敗にして、5% の余裕を残す
-import { readdirSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test } from '@playwright/test'
 
 const LIMIT = 0.95
 const RATIO = 16 / 9
 
-const slugs = readdirSync(join(import.meta.dirname, '..', 'slides'), { withFileTypes: true })
-	.filter((entry) => entry.isDirectory())
+const SLIDES = join(import.meta.dirname, '..', 'slides')
+// scripts/inline-decks.ts と同じく、deck.mdx のあるディレクトリだけをデッキとする。
+// 記事を取り込んだだけで原稿がまだないディレクトリは、ページにならない
+const slugs = readdirSync(SLIDES, { withFileTypes: true })
+	.filter((entry) => entry.isDirectory() && existsSync(join(SLIDES, entry.name, 'deck.mdx')))
 	.map((entry) => entry.name)
 
 test.use({ viewport: { width: 1920, height: 1080 } })

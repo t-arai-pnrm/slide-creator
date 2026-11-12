@@ -1,19 +1,17 @@
 // 発表のための操作（src/scripts/deck.ts）を確かめる。
 // 横長の画面で JavaScript が動くときだけ 1 枚ずつ表示し、縦長の画面と JavaScript が動かない環境では縦に並べた形のままにする。
-// 見本のデッキ（src/pages/index.astro）は、最後の 1 枚にだけリンクがある
+// 見本のデッキ（slides/sample/deck.mdx）は、最後の 1 枚にだけリンクがある
 import { readFileSync } from 'node:fs'
 
 import { expect, test, type Page } from '@playwright/test'
 
-// 枚数は、見本のデッキの `const total = …` から読む。テストの名前（#99 を寄せる先）にも使うので、ページを開く前に決める。
+import { countSlides } from '../scripts/vite-plugin-slide-numbers.ts'
+
+const DECK_PATH = '/sample/'
+// 枚数は、ビルドでページ番号を足すときと同じ数え方で、見本のデッキの原稿から数える。
+// テストの名前（#99 を寄せる先）にも使うので、ページを開く前に決める。
 // 実際のスライドの数と食い違えば、縦に並べた形のテスト（expectScrollView）で落ちる
-const readTotal = () => {
-	const source = readFileSync(new URL('../src/pages/index.astro', import.meta.url), 'utf8')
-	const match = /^const total = (\d+)$/m.exec(source)
-	if (!match?.[1]) throw new Error('src/pages/index.astro に `const total = <数>` が見つからない')
-	return Number(match[1])
-}
-const TOTAL = readTotal()
+const TOTAL = countSlides(readFileSync(new URL('../slides/sample/deck.mdx', import.meta.url), 'utf8'))
 const LANDSCAPE = { width: 1280, height: 720 }
 const PORTRAIT = { width: 375, height: 812 }
 // DESIGN.md の「操作の部分」の、マウスを止めてから隠すまでの時間
@@ -55,7 +53,7 @@ test.describe('横長の画面', () => {
 	test.use({ viewport: LANDSCAPE })
 
 	test('発表の表示になり、1 枚目から始まり、操作の部分が出る', async ({ page }) => {
-		await page.goto('/')
+		await page.goto(DECK_PATH)
 		await expect(deck(page)).toHaveAttribute('data-view', 'present')
 		await expectCurrent(page, 1)
 		await expect(controls(page)).toBeVisible()
@@ -64,13 +62,13 @@ test.describe('横長の画面', () => {
 	})
 
 	test('今のスライドだけが見える', async ({ page }) => {
-		await page.goto('/')
+		await page.goto(DECK_PATH)
 		const all = await slides(page).all()
 		await Promise.all(all.map((slide, i) => (i === 0 ? expect(slide).toBeVisible() : expect(slide).toBeHidden())))
 	})
 
 	test('矢印キー、スペース、Page Up / Page Down、Home / End で移り、ハッシュが変わる', async ({ page }) => {
-		await page.goto('/')
+		await page.goto(DECK_PATH)
 		await page.keyboard.press('ArrowRight')
 		await expectCurrent(page, 2)
 		await page.keyboard.press('ArrowLeft')
@@ -97,7 +95,7 @@ test.describe('横長の画面', () => {
 	})
 
 	test('移っても履歴を積まない', async ({ page }) => {
-		await page.goto('/')
+		await page.goto(DECK_PATH)
 		const length = await page.evaluate(() => history.length)
 		await page.keyboard.press('ArrowRight')
 		await page.keyboard.press('ArrowRight')
@@ -106,14 +104,14 @@ test.describe('横長の画面', () => {
 	})
 
 	test('修飾キーの付いたキーでは移らない', async ({ page }) => {
-		await page.goto('/')
+		await page.goto(DECK_PATH)
 		await page.keyboard.press('Control+ArrowRight')
 		await page.keyboard.press('Control+Space')
 		await expectCurrent(page, 1)
 	})
 
 	test('前へ、次へのボタンで移り、端のボタンは aria-disabled になる', async ({ page }) => {
-		await page.goto('/')
+		await page.goto(DECK_PATH)
 		await expect(controlButton(page, '前へ')).toHaveAttribute('aria-disabled', 'true')
 		await controlButton(page, '次へ').click()
 		await expectCurrent(page, 2)
@@ -125,7 +123,7 @@ test.describe('横長の画面', () => {
 	})
 
 	test('#3 で開くと 3 枚目から始まる', async ({ page }) => {
-		await page.goto('/#3')
+		await page.goto(`${DECK_PATH}#3`)
 		await expectCurrent(page, 3)
 	})
 
@@ -135,13 +133,13 @@ test.describe('横長の画面', () => {
 		{ hash: '#abc', expected: 1 },
 	]) {
 		test(`範囲の外や数でないハッシュ（${hash}）は、${expected} 枚目に寄せる`, async ({ page }) => {
-			await page.goto(`/${hash}`)
+			await page.goto(`${DECK_PATH}${hash}`)
 			await expectCurrent(page, expected)
 		})
 	}
 
 	test('アドレスバーでハッシュを変えると、そのスライドに移る', async ({ page }) => {
-		await page.goto('/')
+		await page.goto(DECK_PATH)
 		await page.evaluate(() => {
 			location.hash = '#2'
 		})
@@ -154,7 +152,7 @@ test.describe('横長の画面', () => {
 	})
 
 	test('画面の左の 3 分の 1 をクリックすると前へ、それ以外では次へ移る', async ({ page }) => {
-		await page.goto('/#2')
+		await page.goto(`${DECK_PATH}#2`)
 		const y = LANDSCAPE.height / 2
 		await page.mouse.click(LANDSCAPE.width * 0.8, y)
 		await expectCurrent(page, 3)
@@ -165,7 +163,7 @@ test.describe('横長の画面', () => {
 	})
 
 	test('横にスワイプすると移り、続くクリックはタップに数えない', async ({ page }) => {
-		await page.goto('/#2')
+		await page.goto(`${DECK_PATH}#2`)
 		// Playwright にはスワイプの操作がないので、タッチのポインターイベントを送る
 		const swipe = (fromX: number, toX: number) =>
 			deck(page).evaluate(
@@ -184,7 +182,7 @@ test.describe('横長の画面', () => {
 	})
 
 	test('ノートの領域をクリックしても、スライドを移さない', async ({ page }) => {
-		await page.goto('/#2')
+		await page.goto(`${DECK_PATH}#2`)
 		await page.keyboard.press('n')
 		const notes = slides(page).nth(1).locator('._notes')
 		await expect(notes).toBeVisible()
@@ -196,7 +194,7 @@ test.describe('横長の画面', () => {
 	})
 
 	test('ノートの領域はキーボードでフォーカスでき、名前が付いている', async ({ page }) => {
-		await page.goto('/')
+		await page.goto(DECK_PATH)
 		await page.keyboard.press('n')
 		const notes = slides(page).first().locator('._notes')
 		await expect(notes).toHaveAttribute('tabindex', '0')
@@ -209,7 +207,7 @@ test.describe('横長の画面', () => {
 	})
 
 	test('印刷の前に縦に並べた形にしてすべてのスライドを出し、印刷の後に発表の表示に戻す', async ({ page }) => {
-		await page.goto('/#3')
+		await page.goto(`${DECK_PATH}#3`)
 		await expectCurrent(page, 3)
 
 		await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')))
@@ -226,7 +224,7 @@ test.describe('横長の画面', () => {
 	})
 
 	test('印刷のメディアに替わったときも、すべてのスライドを出す', async ({ page }) => {
-		await page.goto('/#3')
+		await page.goto(`${DECK_PATH}#3`)
 		await expectCurrent(page, 3)
 		// beforeprint が起きない場合の備えとして、matchMedia('print') の change だけでも切り替わることを確かめる
 		await page.emulateMedia({ media: 'print' })
@@ -236,7 +234,7 @@ test.describe('横長の画面', () => {
 	})
 
 	test('N とボタンでノートの状態が切り替わり、aria-pressed が変わる', async ({ page }) => {
-		await page.goto('/')
+		await page.goto(DECK_PATH)
 		const button = controlButton(page, 'ノート')
 		await expect(deck(page)).toHaveAttribute('data-notes', 'hidden')
 		await expect(button).toHaveAttribute('aria-pressed', 'false')
@@ -251,14 +249,14 @@ test.describe('横長の画面', () => {
 	})
 
 	test('ノートを出すと、今のスライドのノートが見える', async ({ page }) => {
-		await page.goto('/')
+		await page.goto(DECK_PATH)
 		await expect(slides(page).first().locator('._notes')).toBeHidden()
 		await page.keyboard.press('n')
 		await expect(slides(page).first().locator('._notes')).toBeVisible()
 	})
 
 	test('ボタンにフォーカスがあるときのスペースは、ボタンを押し、スライドを移さない', async ({ page }) => {
-		await page.goto('/')
+		await page.goto(DECK_PATH)
 		await controlButton(page, 'ノート').focus()
 		await page.keyboard.press('Space')
 		await expect(deck(page)).toHaveAttribute('data-notes', 'shown')
@@ -266,7 +264,7 @@ test.describe('横長の画面', () => {
 	})
 
 	test('D でテーマが切り替わり、再読み込みしても残る', async ({ page }) => {
-		await page.goto('/')
+		await page.goto(DECK_PATH)
 		const button = controlButton(page, 'ダーク')
 		await expect(colorScheme(page)).toHaveAttribute('content', 'light only')
 		await expect(button).toHaveAttribute('aria-pressed', 'false')
@@ -292,7 +290,7 @@ test.describe('横長の画面', () => {
 			}
 			Object.defineProperty(window, 'localStorage', { get: fail, configurable: true })
 		})
-		await page.goto('/')
+		await page.goto(DECK_PATH)
 		await expect(colorScheme(page)).toHaveAttribute('content', 'light only')
 		await page.keyboard.press('d')
 		await expect(colorScheme(page)).toHaveAttribute('content', 'dark only')
@@ -301,7 +299,7 @@ test.describe('横長の画面', () => {
 	test('ボタンの名前は見えない文字で、キーは aria-keyshortcuts で伝え、名前とキーは読み上げないツールチップで見せる', async ({
 		page,
 	}) => {
-		await page.goto('/')
+		await page.goto(DECK_PATH)
 		const expected = [
 			{ name: '前へ', shortcuts: 'ArrowLeft PageUp Shift+Space', key: '←' },
 			{ name: '次へ', shortcuts: 'ArrowRight PageDown Space', key: '→' },
@@ -329,7 +327,7 @@ test.describe('横長の画面', () => {
 	})
 
 	test('ハイライトは帯の擬似要素で 1 つだけ描き、読み上げない', async ({ page }) => {
-		await page.goto('/')
+		await page.goto(DECK_PATH)
 		// ハイライトは飾りなので、マークアップに要素を置かず、帯の ::before で描く
 		await expect(controls(page).locator('._highlight')).toHaveCount(0)
 		// content が空の文字列で始まれば、擬似要素が描かれ、読み上げる文字もない（代替の文字を付けた形 `"" / ""` も含む）
@@ -340,13 +338,13 @@ test.describe('横長の画面', () => {
 	})
 
 	test('全画面に対応していれば全画面のボタンを出し、対応していなければ出さない', async ({ page }) => {
-		await page.goto('/')
+		await page.goto(DECK_PATH)
 		const enabled = await page.evaluate(() => document.fullscreenEnabled)
 		await expect(controls(page).locator('[data-action="fullscreen"]')).toBeVisible({ visible: enabled })
 	})
 
 	test('見えないスライドにはフォーカスが移らない', async ({ page }) => {
-		await page.goto('/')
+		await page.goto(DECK_PATH)
 		// 最後のスライドにだけリンクがある。1 枚目を表示している間は、Tab で一周してもそのリンクに止まらない
 		await expect(lastSlideLink(page)).toHaveCount(1)
 		for (let i = 0; i < 12; i++) {
@@ -366,7 +364,7 @@ test.describe('横長の画面', () => {
 	})
 
 	test('リンクにフォーカスがあるときのスペースでは、スライドを移さない', async ({ page }) => {
-		await page.goto(`/#${TOTAL}`)
+		await page.goto(`${DECK_PATH}#${TOTAL}`)
 		await lastSlideLink(page).focus()
 		await page.keyboard.press('Shift+Space')
 		await expectCurrent(page, TOTAL)
@@ -374,7 +372,7 @@ test.describe('横長の画面', () => {
 
 	test('マウスを 2 秒動かさないと操作の部分に data-idle が付き、動かすと外れる', async ({ page }) => {
 		await page.clock.install()
-		await page.goto('/')
+		await page.goto(DECK_PATH)
 		await expect(controls(page)).not.toHaveAttribute('data-idle')
 		await page.clock.runFor(IDLE_DELAY_MS + 100)
 		await expect(controls(page)).toHaveAttribute('data-idle')
@@ -385,7 +383,7 @@ test.describe('横長の画面', () => {
 
 	test('キーボードのフォーカスが操作の部分にある間は、data-idle を付けない', async ({ page }) => {
 		await page.clock.install()
-		await page.goto('/')
+		await page.goto(DECK_PATH)
 		// WebKit は既定で Tab がボタンに止まらないので、キーを押してから（キーボードの操作の直後として :focus-visible が付く）
 		// スクリプトでフォーカスを移す
 		await page.keyboard.press('Shift')
@@ -396,7 +394,7 @@ test.describe('横長の画面', () => {
 	})
 
 	test('P で、?presenter を付けた発表者ビューを別のウィンドウで開く', async ({ page }) => {
-		await page.goto('/#2')
+		await page.goto(`${DECK_PATH}#2`)
 		const [popup] = await Promise.all([page.waitForEvent('popup'), page.keyboard.press('p')])
 		await popup.waitForLoadState()
 		expect(new URL(popup.url()).search).toBe('?presenter')
@@ -409,7 +407,7 @@ test.describe('画面の向きが変わったとき', () => {
 	test.use({ viewport: LANDSCAPE })
 
 	test('縦長にすると縦に並べた形に戻り、横長に戻すと発表の表示になる', async ({ page }) => {
-		await page.goto('/#3')
+		await page.goto(`${DECK_PATH}#3`)
 		await expectCurrent(page, 3)
 
 		await page.setViewportSize(PORTRAIT)
@@ -437,12 +435,12 @@ test.describe('縦長の画面', () => {
 	test.use({ viewport: PORTRAIT })
 
 	test('縦に並べた形のままで、操作の部分が出ない', async ({ page }) => {
-		await page.goto('/#2')
+		await page.goto(`${DECK_PATH}#2`)
 		await expectScrollView(page)
 	})
 
 	test('キーでスライドを移さず、ハッシュも書き換えない', async ({ page }) => {
-		await page.goto('/')
+		await page.goto(DECK_PATH)
 		await page.keyboard.press('ArrowRight')
 		await page.keyboard.press('n')
 		await expect(page).toHaveURL(/\/$/)
@@ -454,7 +452,7 @@ test.describe('JavaScript が動かない環境（横長の画面）', () => {
 	test.use({ viewport: LANDSCAPE, javaScriptEnabled: false })
 
 	test('縦に並べた形のままで、操作の部分が出ない', async ({ page }) => {
-		await page.goto('/')
+		await page.goto(DECK_PATH)
 		await expectScrollView(page)
 	})
 })
@@ -463,7 +461,7 @@ test.describe('発表者ビュー', () => {
 	test.use({ viewport: LANDSCAPE })
 
 	test('今のスライドと次のスライドを属性で示し、次のスライドは操作できない', async ({ page }) => {
-		await page.goto('/?presenter#2')
+		await page.goto(`${DECK_PATH}?presenter#2`)
 		await expect(deck(page)).toHaveAttribute('data-view', 'presenter')
 		await expect(deck(page)).toHaveAttribute('data-notes', 'shown')
 		await expect(slides(page).nth(1)).toHaveAttribute('data-slide', 'current')
@@ -477,14 +475,14 @@ test.describe('発表者ビュー', () => {
 	})
 
 	test('最後のスライドでは、次のスライドがない', async ({ page }) => {
-		await page.goto(`/?presenter#${TOTAL}`)
+		await page.goto(`${DECK_PATH}?presenter#${TOTAL}`)
 		await expect(slides(page).nth(TOTAL - 1)).toHaveAttribute('data-slide', 'current')
 		await expect(page.locator('[data-slide="next"]')).toHaveCount(0)
 	})
 
 	test('縦長の画面でも発表者ビューになる', async ({ page }) => {
 		await page.setViewportSize(PORTRAIT)
-		await page.goto('/?presenter')
+		await page.goto(`${DECK_PATH}?presenter`)
 		await expect(deck(page)).toHaveAttribute('data-view', 'presenter')
 	})
 
@@ -493,7 +491,7 @@ test.describe('発表者ビュー', () => {
 		// install() のままでは時計が実時間でも進み、遅いブラウザ（Firefox）で 1 秒ずれて失敗することがあったため。
 		// 1 秒ごとの描き直しは本物のタイマーで動くので、固定した時刻を進めたあとの表示を待てる
 		await page.clock.setFixedTime(TIMER_START)
-		await page.goto('/?presenter')
+		await page.goto(`${DECK_PATH}?presenter`)
 		const timer = page.locator('.presenter-timer')
 		const elapsed = timer.getByRole('timer').locator('time')
 		await expect(timer).toBeVisible()
@@ -516,7 +514,7 @@ test.describe('発表者ビュー', () => {
 
 	test('99 分を超えると、見える数字は 99:59 で止め、読み上げは実際の時間を伝える', async ({ page }) => {
 		await page.clock.setFixedTime(TIMER_START)
-		await page.goto('/?presenter')
+		await page.goto(`${DECK_PATH}?presenter`)
 		await page.clock.setFixedTime(TIMER_START + (100 * 60 + 5) * 1000)
 		const elapsed = page.getByRole('timer').locator('time')
 		await expect(elapsed).toHaveText('100 分 5 秒')
@@ -525,17 +523,17 @@ test.describe('発表者ビュー', () => {
 	})
 
 	test('経過時間の見える数字は読み上げない', async ({ page }) => {
-		await page.goto('/?presenter')
+		await page.goto(`${DECK_PATH}?presenter`)
 		await expect(page.getByRole('timer').locator('._digits')).toHaveAttribute('aria-hidden', 'true')
 	})
 
 	test('2 つのウィンドウのどちらで移っても、両方が同じスライドに移る', async ({ context }) => {
 		const audience = await context.newPage()
 		await audience.setViewportSize(LANDSCAPE)
-		await audience.goto('/')
+		await audience.goto(DECK_PATH)
 		const presenter = await context.newPage()
 		await presenter.setViewportSize(LANDSCAPE)
-		await presenter.goto('/?presenter')
+		await presenter.goto(`${DECK_PATH}?presenter`)
 
 		await audience.keyboard.press('ArrowRight')
 		await expectCurrent(audience, 2)

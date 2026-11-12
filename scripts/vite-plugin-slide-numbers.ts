@@ -17,8 +17,8 @@ const DECK = /\/slides\/[^/]+\/deck\.mdx$/
 const FENCE = /^\s*(`{3,}|~{3,})/
 const SLIDE = /^<Slide(?=[\s>/])/
 
-export const addSlideNumbers = (source: string): string => {
-	const lines = source.split('\n')
+// <Slide> の行の位置（0 から数える）を返す。e2e のテストも、ここで数えた枚数を期待する値に使う
+const findSlideLines = (lines: readonly string[]): number[] => {
 	let fence: string | null = null
 	const slideLines: number[] = []
 	lines.forEach((line, index) => {
@@ -29,7 +29,14 @@ export const addSlideNumbers = (source: string): string => {
 		}
 		if (fence === null && SLIDE.test(line)) slideLines.push(index)
 	})
+	return slideLines
+}
 
+export const countSlides = (source: string): number => findSlideLines(source.split('\n')).length
+
+export const addSlideNumbers = (source: string): string => {
+	const lines = source.split('\n')
+	const slideLines = findSlideLines(lines)
 	const total = slideLines.length
 	slideLines.forEach((lineIndex, slideIndex) => {
 		const line = lines[lineIndex] ?? ''

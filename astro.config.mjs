@@ -12,9 +12,8 @@ export default defineConfig({
 	build: {
 		// 1 つのデッキを 1 つの HTML にするため、CSS を別のファイルにせず HTML に埋め込む。
 		// 既定（'auto'）は 4KB を超える CSS を <link> で読み込み、HTML だけを持ち出すとスタイルが外れる。
-		// 埋め込むのは CSS だけで、スクリプトと欧文の書体（woff2）は、まだ _astro/ の別のファイルとして出力され、
-		// HTML だけを持ち出すと、発表の表示が動かず、欧文は代わりの書体で出る。この 2 つは、ビルドの後段で
-		// デッキを 1 つの HTML にまとめる処理（別の作業で作る）で埋め込む予定で、Astro の設定では埋め込まない
+		// Astro が埋め込むのは CSS だけで、スクリプトと欧文の書体（woff2）は _astro/ の別のファイルとして出力される。
+		// この 2 つは、ビルドの後段の scripts/inline-decks.ts が埋め込み、dist/<slug>.html の 1 ファイルにする
 		inlineStylesheets: 'always',
 	},
 	vite: {
