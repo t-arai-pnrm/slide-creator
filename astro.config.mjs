@@ -1,7 +1,11 @@
+import mdx from '@astrojs/mdx'
 import { defineConfig } from 'astro/config'
+import slideNumbers from './scripts/vite-plugin-slide-numbers.ts'
 
 // https://astro.build/config
 export default defineConfig({
+	// スライドの原稿（slides/<slug>/deck.mdx）を読む
+	integrations: [mdx()],
 	// Astro 7 の既定（'jsx'）は要素間の空白を消すため、HTML と同じ空白の扱いにする（taklog と同じ）
 	compressHTML: true,
 	build: {
@@ -13,6 +17,7 @@ export default defineConfig({
 		inlineStylesheets: 'always',
 	},
 	vite: {
+		plugins: [slideNumbers()],
 		build: {
 			// CSS を圧縮する Lightning CSS の対象ブラウザを .browserslistrc にそろえる。既定（baseline-widely-available）のままだと、
 			// light-dark() を --lightningcss-light / --lightningcss-dark を使う形に書き換える。この 2 つの変数は CSS に color-scheme を
