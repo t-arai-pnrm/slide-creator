@@ -22,6 +22,8 @@
  * 文字は枠に比例させず、rem の control のスタイルで書く。置き場所（発表の表示で枠の右上に重ねる）は、置く側の Deck.astro が決める。
  *
  * @prop {number} [--deck-controls--progress=0] 進み具合の割合（0 より大きく 1 以下）。スクリプトが文書のルート（html）に書き、継承で受ける
+ * @prop {--block-start|--block-end} [--deck-controls--tooltip-side=--block-end] ツールチップをボタンの上（--block-start）と下（--block-end）のどちらに出すか。
+ *   置く側が、帯の置き場所に合わせて渡す（発表者ビューでは帯を画面の下の端に置くので --block-start）
  */
 import Icon from '@/components/Icon.astro'
 ---
@@ -84,6 +86,9 @@ import Icon from '@/components/Icon.astro'
 	@layer components {
 		.deck-controls {
 			--_progress: var(--deck-controls--progress, 0);
+
+			/* ツールチップを出す側。ボタンのツールチップがスタイルクエリで読む */
+			--_tooltip-side: var(--deck-controls--tooltip-side, --block-end);
 
 			/* 帯の内側の余白。ボタンの角丸も、帯の角丸からこの値を引いて求める（DESIGN.md の「操作の部分」） */
 			--_band-padding: 0.25rem;
@@ -411,7 +416,7 @@ import Icon from '@/components/Icon.astro'
 			}
 
 			/*
-			 * ツールチップは、ボタンの中央の下に出す。帯は画面の上端にあるので、上ではなく下に出す。
+			 * ツールチップは、ボタンの中央の下に出す。発表の表示では帯は枠の上端にあるので、上ではなく下に出す。
 			 * ボタンを包含ブロックにした絶対配置で置き、アンカーポジショニングに対応しない環境でも同じ位置に出す
 			 * （no-unsupported-layout-features）。動かさないので、中央に寄せる translate は描き直しの負荷にならない
 			 */
@@ -420,6 +425,14 @@ import Icon from '@/components/Icon.astro'
 				inset-block-start: calc(100% + 0.375rem);
 				inset-inline-start: 50%;
 				translate: -50% 0;
+
+				/*
+				 * 置く側が帯を画面の下の端に置くとき（発表者ビュー）は、ボタンの上に出す。
+				 * 下に出すと画面の外にはみ出すため（DESIGN.md の「発表者ビュー」）。置き場所は公開プロパティで受ける（placement-via-public-flag）
+				 */
+				@container style(--_tooltip-side: --block-start) {
+					inset-block: auto calc(100% + 0.375rem);
+				}
 			}
 
 			/*

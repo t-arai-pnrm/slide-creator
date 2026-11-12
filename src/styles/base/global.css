@@ -6,9 +6,10 @@
  * 全称セレクタの min-inline-size: 0 だけは例外にする
  * （global-min-inline-size-zero）。
  *
- * 文字の大きさ、余白、線の太さはここで当てない。cqi のトークンを
+ * スライドの中の文字の大きさ、余白、線の太さはここで当てない。cqi のトークンを
  * ここで当てると、枠の外の画面の幅で長さに計算され、その長さのまま
  * 子に継承されるため。枠の中の要素で当てる。
+ * 例外は、:root の文字の大きさ（rem の基準）だけにする（下の :root）。
  * line-break: strict、text-autospace、overflow-wrap は、
  * kiso.css が :root に指定しているので、ここでは書き足さない
  * （reset-japanese-defaults-on-root）。
@@ -28,6 +29,14 @@
 	background-color: var(--background--base);
 	color: var(--foreground--base);
 	font-family: var(--text--body--font-family);
+
+	/*
+	 * rem の基準を画面の幅に比例させ、rem で決めたスライドの外（ノート、操作の部分、ツールチップ、タイマー）を、
+	 * 狭い画面でまとめて縮める。幅が 1280px 以上では 16px のままにし、11px で止める（DESIGN.md の「文字のスタイル」）。
+	 * ブラウザの文字の大きさの設定には追従させないと決めている（no-root-font-size-change、verify-text-resize-200 と違う点）
+	 */
+	/* stylelint-disable-next-line rule-selector-property-disallowed-list, declaration-property-value-disallowed-list -- DESIGN.md で 11px と 16px に決め、ブラウザの文字の大きさの設定に追従させないため（上のコメント） */
+	font-size: clamp(11px, 1.25svi, 16px);
 	line-height: var(--text--body--leading);
 	text-underline-offset: 25%;
 

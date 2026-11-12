@@ -27,13 +27,15 @@ const flagCode = flagLines.map(([text, mark]) => (mark ? `<span class="-mark">${
 		<Fragment slot="title">コンテナスタイルクエリで、カスタムプロパティをフラグにする</Fragment>
 		<p>Takahiro Arai</p>
 		<p slot="notes">
-			祖先のカスタムプロパティの値を条件にして、子孫のスタイルを切り替える話。幅やホバーの状態を、1か所でフラグに置き換える書き方を紹介する。
+			今日は、コンテナスタイルクエリを使って、カスタムプロパティをフラグとして扱う書き方を紹介します。祖先の要素にカスタムプロパティを置き、その値を条件にして、子孫のスタイルを切り替えます。こうすると、幅が広いかどうかや、ホバーしているかどうかといった状態を、1か所で判定して子孫に伝えられます。
 		</p>
 	</Slide>
 
 	<Slide page={2} total={total} layout="section" chapter="01">
 		<Fragment slot="title">サイズクエリの閾値が散らばる</Fragment>
-		<p slot="notes">まず、サイズクエリだけで書いたときに何が困るかを見る。</p>
+		<p slot="notes">
+			最初に、サイズクエリだけで書いたときに何が困るのかを見ます。コンテナの幅で見た目を変えたいときに、まず使うのはサイズクエリです。ところが、変えたい子要素が増えるほど、同じ条件をあちこちに書くことになります。
+		</p>
 	</Slide>
 
 	<Slide page={3} total={total} chapter="01 — Problem">
@@ -43,7 +45,7 @@ const flagCode = flagLines.map(([text, mark]) => (mark ? `<span class="-mark">${
 			<pre class="code-block" set:html={scatteredCode} />
 		</figure>
 		<p slot="notes">
-			記事カードで、サムネイルを横に並べ、正方形にし、題の文字を大きくする。変えたい子要素ごとのルールにサイズクエリを書くと、同じcalc()の閾値が子の数だけ並ぶ。
+			題材は記事カードです。幅が広いときに、サムネイルを横に並べて正方形にし、題の文字を大きくしたいとします。変えたい子要素ごとのルールにサイズクエリを書くと、レイアウト、サムネイル、題の3つのルールに同じ条件が並びます。スライドでは短く「閾値」と書きましたが、実際にはcalc()で書いた同じ式が、子の数だけ繰り返されます。
 		</p>
 	</Slide>
 
@@ -51,13 +53,15 @@ const flagCode = flagLines.map(([text, mark]) => (mark ? `<span class="-mark">${
 		<Fragment slot="title">1か所でも直し忘れると、<br />デザインにない状態ができる</Fragment>
 		<p>横並びなのに、題の文字は小さいまま。</p>
 		<p slot="notes">
-			閾値をカスタムプロパティに入れて共有できればよいが、サイズクエリの条件でvar()を使う書き方は、2026年11月の時点で対象のブラウザすべてでは使えない。
+			3か所のうち1か所でも直し忘れると、デザインにない状態ができます。たとえば、カードは横並びになったのに、題の文字だけが小さいまま、という状態です。閾値をカスタムプロパティに入れて共有できればよいのですが、サイズクエリの条件でvar()を使う書き方は、2026年11月の時点で、対象のブラウザのすべてでは使えません。
 		</p>
 	</Slide>
 
 	<Slide page={5} total={total} layout="section" chapter="02">
 		<Fragment slot="title">スタイルクエリで、判定を1か所にまとめる</Fragment>
-		<p slot="notes">ここからが本題。幅を判定した結果を、カスタムプロパティで子孫に伝える。</p>
+		<p slot="notes">
+			ここからが本題です。幅の判定は1か所にまとめ、その結果をカスタムプロパティのフラグとして子孫に伝えます。子孫は、スタイルクエリでフラグの値を読むだけにします。判定にはサイズクエリを、読み取りにはスタイルクエリを使います。
+		</p>
 	</Slide>
 
 	<Slide page={6} total={total} chapter="02 — Mechanism">
@@ -88,7 +92,7 @@ const flagCode = flagLines.map(([text, mark]) => (mark ? `<span class="-mark">${
 			</li>
 		</ol>
 		<p slot="notes">
-			サイズクエリを書くのは、フラグを宣言する._layoutのルールだけ。フラグをルートに置かないのは、コンテナが自分の幅を条件にできないため。
+			流れは3段です。まず、判定する場所の._layoutのルールで、サイズクエリを使って幅を見ます。幅が広ければ、--_densityというフラグを立てます。子孫は、style()でそのフラグの値を読みます。サイズクエリを書くのは、フラグを宣言する._layoutのルールだけです。フラグをルートの要素に置かないのは、コンテナが自分の幅を条件にできないためです。
 		</p>
 	</Slide>
 
@@ -99,8 +103,8 @@ const flagCode = flagLines.map(([text, mark]) => (mark ? `<span class="-mark">${
 			<pre class="code-block" set:html={flagCode} />
 		</figure>
 		<p slot="notes">
-			狭い幅の見た目はクエリなしで書き、広い幅の見た目だけをstyle()の中に書く。名前を付けない@container
-			style()は親を問い合わせ、継承したフラグも読める。
+			子孫の側のコードです。題の文字は、狭い幅の見た目をクエリなしで書き、広い幅の見た目だけをstyle()の中に書きます。印を付けた行が、フラグを読んでいるところで、ここには閾値が出てきません。名前を付けない@container
+			style()は、親の要素を問い合わせます。カスタムプロパティは継承されるので、祖先で立てたフラグもここで読めます。
 		</p>
 	</Slide>
 
@@ -118,20 +122,24 @@ const flagCode = flagLines.map(([text, mark]) => (mark ? `<span class="-mark">${
 				<p>判定は1か所、ほかは値を読むだけ</p>
 			</div>
 		</div>
-		<p slot="notes">要素の見た目は、その要素のルールの中にまとまったまま。閾値の1か所化と両立できる。</p>
+		<p slot="notes">
+			比べると、閾値を書く場所は3か所から1か所に減ります。サイズクエリだけのときは、子要素ごとに同じ条件を書いていました。フラグを使うと、判定は._layoutの1か所で、ほかのルールは値を読むだけです。それでいて、各要素の見た目は、その要素のルールの中にまとまったままです。閾値を1か所にまとめることと、見た目を要素ごとにまとめることを両立できます。
+		</p>
 	</Slide>
 
 	<Slide page={9} total={total} layout="statement">
 		<Fragment slot="title">ホバーとフォーカスも、フラグにして子孫に配れる</Fragment>
 		<p><code>:has()</code>で子のリンクの状態を受け、<code>--_has-hocus: --true</code>を立てる。</p>
 		<p slot="notes">
-			記事一覧の行は、押せるのが題のリンクだけで、見た目を変えたいのは日付と矢印。子の状態を:has()で親に上げてから、フラグで子孫に配る。
+			フラグにできるのは幅だけではありません。記事一覧の行を例にします。押せるのは題のリンクだけですが、ホバーやフォーカスで見た目を変えたいのは、日付や矢印のほうです。そこで、まず:has()で子のリンクの状態を親の行で受け、--_has-hocusを--trueにします。あとは幅のときと同じく、子孫がstyle()でそのフラグを読みます。
 		</p>
 	</Slide>
 
 	<Slide page={10} total={total} layout="section" chapter="03">
 		<Fragment slot="title">フラグの決まりと、対応状況</Fragment>
-		<p slot="notes">最後に、書き間違いを防ぐ決まりと、使えるブラウザを確認する。</p>
+		<p slot="notes">
+			最後の章は、フラグを使うときの決まりと、ブラウザの対応状況です。この書き方は、値を書き間違えてもエラーにならず、条件が成り立たなくなるだけです。気付きにくい失敗なので、書き方の決まりを先にそろえておきます。
+		</p>
 	</Slide>
 
 	<Slide page={11} total={total} chapter="03 — Rules">
@@ -149,7 +157,7 @@ const flagCode = flagLines.map(([text, mark]) => (mark ? `<span class="-mark">${
 			</div>
 		</div>
 		<p slot="notes">
-			初期値を書かないと、外側のコンポーネントで同じ名前のフラグが立っていたときに、その値を継承してしまう。範囲の比較はSafariが対応するまで使わない。
+			フラグの値には、1やtrueではなく、--trueや--falseのように、--で始まる識別子を使います。こうすると、CSSのキーワードとぶつかりません。もう1つの決まりは、初期値をクエリの外に書くことです。初期値を書かないと、外側のコンポーネントで同じ名前のフラグが立っていたときに、その値を継承してしまいます。なお、範囲の比較は、Safariが対応するまで使いません。
 		</p>
 	</Slide>
 
@@ -170,7 +178,7 @@ const flagCode = flagLines.map(([text, mark]) => (mark ? `<span class="-mark">${
 			</li>
 		</ol>
 		<p slot="notes">
-			2026年5月からBaselineの「新しく利用可能」。対応していない環境ではstyle()の中が当たらず、初期値の見た目が残る。
+			対応状況です。ChromeとEdgeが111で最初に対応し、続いてSafariが18で対応しました。2026年5月にFirefoxが151で対応し、Baselineの「新しく利用可能」になりました。対応していないブラウザでは、style()の中のスタイルが当たらず、初期値の見た目が残ります。今日の例なら、狭い幅のときの見た目で表示されます。
 		</p>
 	</Slide>
 
@@ -182,10 +190,16 @@ const flagCode = flagLines.map(([text, mark]) => (mark ? `<span class="-mark">${
 				<span class="source-url">tak-dcxi.com/article/how-to-use-container-style-queries/</span>
 			</li>
 		</ul>
+		<p slot="notes">
+			この発表は、taklogに書いた記事「コンテナスタイルクエリでカスタムプロパティをフラグとして扱う」をもとにしています。今日は、スライドに収まる範囲に絞って話しました。記事のURLをスライドに載せているので、詳しくはそちらを読んでください。
+		</p>
 	</Slide>
 
 	<Slide page={14} total={total} layout="end" chapter="Thank you">
 		<Fragment slot="title">フラグは1か所で立て、子孫は読むだけにする</Fragment>
 		<p>Takahiro Arai</p>
+		<p slot="notes">
+			まとめです。幅やホバーのような状態の判定は1か所で行い、その結果をカスタムプロパティのフラグとして立てます。子孫は、style()でそのフラグを読むだけにします。こうすると、閾値が1か所にまとまり、見た目は要素ごとのルールに残せます。ご清聴ありがとうございました。
+		</p>
 	</Slide>
 </Deck>

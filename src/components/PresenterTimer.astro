@@ -1,6 +1,6 @@
 ---
 /**
- * 発表者ビューの経過時間と、時間を 0 に戻すボタン。src/scripts/deck.ts が、発表者ビューのときだけ hidden を外して動かす。
+ * 発表者ビューの経過時間と、その再生、一時停止、停止のボタン。src/scripts/deck.ts が、発表者ビューのときだけ hidden を外して動かす。
  * 経過時間は 1 秒ごとに変わるので、ライブリージョンにしない。読み上げが発表の間ずっと続くため。
  * 役割は timer にする。timer は既定で aria-live="off" なので、値が変わっても読み上げず、読みに来たときに今の値が分かる。
  *
@@ -8,10 +8,13 @@
  * 帯の数字は読み上げると「0 1 2 …」と並んで意味をなさないので、aria-hidden で隠し、読み上げは見えない time の文字（「1 分 5 秒」）で伝える。
  * 「01:05」の形は時刻と区別しにくいので、読み上げの文字は分と秒を言葉で書く。
  *
- * 0 に戻すボタンの見えるラベルは「0に戻す」で、何を戻すかは見えない文字の「時間を」で補う。
- * 名前の「時間を 0に戻す」が見えるラベルを含むので、音声入力で見えるラベルを言っても押せる（WCAG 2.5.3）。
- * 名前の「時間を」の後ろの空白は、見えない文字が position: fixed で block になるため、名前の計算で入る。
- * 数字と和文の間は text-autospace が空けるので、ラベルに空白を書かない。書くと間が広く開いて見える。
+ * 開いたときは止まった状態で 0 から始め、再生を押してから数える。発表の前に開いておき、話し始めに合わせて数え始めるため。
+ * ボタンは操作の部分（DeckControls）と同じ形にする。アイコンだけを見せ、名前は見えない文字でボタンに持たせ、
+ * 名前を読み上げないツールチップ（aria-hidden）で見せる。キーは割り当てないので、aria-keyshortcuts もツールチップの kbd も付けない。
+ * 今の状態で押せないボタン（動いている間の再生など）は、スクリプトが aria-disabled="true" にする。
+ * disabled にしないのは、押したボタンがそのまま押せない状態になる（再生を押すと再生が押せなくなる）ので、
+ * disabled ではフォーカスがボタンから外れてしまうため。
+ * ボタンの帯（._controls）の中の形（._buttons の中に menu）も DeckControls にそろえ、同じ見た目の帯にする。
  *
  * 文字は枠に比例させず、rem の control のスタイルで書く。面と線は、操作の部分（DeckControls）と同じ役割の色にする。
  * 置き場所（画面の上の端）は、置く側の Deck.astro が HTML の順で決める。
@@ -45,16 +48,37 @@ const REEL = Array.from({ length: 10 }, (_, value) => value)
 			</span>
 		</p>
 	</div>
-	<button type="button" class="_reset" data-action="reset-timer">
-		<Icon name="rotate-ccw" /><span class="_reset-label"><span class="-visually-hidden">時間を</span>0に戻す</span>
-	</button>
+	<div class="_controls">
+		<div class="_buttons">
+			<menu aria-label="経過時間の操作">
+				<li>
+					<button type="button" data-action="timer-play">
+						<Icon name="play" /><span class="-visually-hidden">再生</span>
+						<span class="_tooltip" aria-hidden="true">再生</span>
+					</button>
+				</li>
+				<li>
+					<button type="button" data-action="timer-pause">
+						<Icon name="pause" /><span class="-visually-hidden">一時停止</span>
+						<span class="_tooltip" aria-hidden="true">一時停止</span>
+					</button>
+				</li>
+				<li>
+					<button type="button" data-action="timer-stop">
+						<Icon name="square" /><span class="-visually-hidden">停止</span>
+						<span class="_tooltip" aria-hidden="true">停止</span>
+					</button>
+				</li>
+			</menu>
+		</div>
+	</div>
 </div>
 
 <style>
 	@layer components {
 		/*
-		 * 経過時間のカードと、0 に戻すボタンを横に並べ、下端をそろえる。
-		 * 1 行に入らないときは、ボタンをカードの下へ折り返す（DESIGN.md の「タイマー」）
+		 * 経過時間のカードと、ボタンの帯を横に並べ、下端をそろえる。
+		 * 1 行に入らないときは、帯をカードの下へ折り返し、間を上下左右とも 0.75rem 空ける（DESIGN.md の「タイマー」）
 		 */
 		.presenter-timer {
 			display: block flex;
@@ -67,7 +91,7 @@ const REEL = Array.from({ length: 10 }, (_, value) => value)
 			line-height: var(--text--control--leading);
 
 			/* 経過時間と離し、行の終わりに寄せる（flex-auto-margin-for-end-items） */
-			& > ._reset {
+			& > ._controls {
 				margin-inline-start: auto;
 			}
 		}
@@ -141,76 +165,270 @@ const REEL = Array.from({ length: 10 }, (_, value) => value)
 			}
 		}
 
-		/* 押した状態と無効の状態は持たない */
-		._reset {
+		/*
+		 * ボタンの帯。帯、ボタン、ハイライト、ツールチップ、押している間の縮み、無効の見た目は、
+		 * 操作の部分（DeckControls.astro）と同じ値と動きで書く（DESIGN.md の「タイマー」）。
+		 * 同じ CSS は 2 か所だけなので、共通のスタイルにまとめず、それぞれのコンポーネントに書く（rule-of-three）。
+		 * 値や動きを変えるときは、DeckControls.astro も同じように変える。
+		 * 押した状態（aria-pressed）、組の間の線、キーの表示は、このボタンにはないので書かない
+		 */
+		._controls {
+			/* 帯の内側の余白。ボタンの角丸も、帯の角丸からこの値を引いて求める（DESIGN.md の「操作の部分」） */
+			--_band-padding: 0.25rem;
+
+			/* ボタンの間。隙間を作らず、各項目（li）の左右に半分ずつ持たせる（no-gaps-between-hover-items） */
+			--_button-gap: 0.125rem;
+
+			/* 帯の中のボタンを、ポインターかキーボードのフォーカスが指しているか（hocus-via-style-query） */
+			--_has-hocus: --false;
+
+			/* キーボードのフォーカスが帯の中のボタンにあるか。ハイライトとツールチップを動かさずに切り替えるのに使う */
+			--_has-focus-visible: --false;
+
+			/* ハイライトの包含ブロックにする */
+			position: relative;
+
+			/* アンカーの名前が帯の外に届かないよう、範囲を帯の中に限る（anchor-scope-for-repeated-components） */
+			anchor-scope: --presenter-timer-hocus;
+
+			/* 左右は、端のボタンの項目が持つボタンの間の半分を引き、上下と同じ余白に見せる */
+			padding-block: var(--_band-padding);
+			padding-inline: calc(var(--_band-padding) - var(--_button-gap) / 2);
+			border: 1px solid var(--border--base);
+			border-radius: var(--rounded--control);
+			background-color: var(--background--surface);
+
+			/*
+			 * ボタンの間の隙間の上も、その項目（li）の上として数え、ハイライトを消さない。
+			 * 無効のボタンにはハイライトを置かない
+			 */
+			&:has(> ._buttons li:hover > button:not(:disabled, [aria-disabled='true'])) {
+				@media (any-hover) {
+					--_has-hocus: --true;
+				}
+			}
+
+			&:has(> ._buttons button:not(:disabled, [aria-disabled='true']):focus-visible) {
+				--_has-hocus: --true;
+			}
+
+			&:has(> ._buttons :focus-visible) {
+				--_has-focus-visible: --true;
+			}
+
+			/*
+			 * ホバーかフォーカスしたボタンの下に、1 枚の面を重ねる（anchor-indicator-as-decoration）。
+			 * アンカーポジショニングに対応しない環境では描かず、ボタン自身のアイコンの色の変化だけで示す
+			 */
+			&::before {
+				@supports (inset: anchor(inside)) {
+					content: '';
+					position: absolute;
+					inset: anchor(inside);
+					position-anchor: --presenter-timer-hocus;
+
+					/* 強制カラーモードでは、面の色が消える代わりに枠線に色が付く */
+					border: 1px solid transparent;
+					border-radius: calc(var(--rounded--control) - var(--_band-padding));
+					background-color: var(--background--base);
+
+					@container style(--_has-hocus: --false) {
+						opacity: 0;
+					}
+
+					/* キーボードでフォーカスを移したときは、動かさずに一度で移す（no-motion-on-focus-visible） */
+					@container style(--_has-focus-visible: --false) {
+						transition-duration: var(--duration--base);
+						transition-property: opacity;
+						transition-timing-function: var(--ease--out-quint);
+
+						/* ボタンの間を滑らせるのは、動きを減らす設定がないときだけにする（motion-only-with-no-preference） */
+						@container style(--_has-hocus: --true) {
+							@media (prefers-reduced-motion: no-preference) {
+								transition-property: inset, opacity;
+								transition-timing-function: var(--ease--in-out-quint), var(--ease--out-quint);
+							}
+						}
+
+						/*
+						 * ポインターが帯を出たら、薄れ終わるまで最後のボタンの位置に留める。
+						 * アンカーを失った inset は auto に戻るので、離散的な切り替えを step-end で時間の終わりまで遅らせる。
+						 * allow-discrete はこの状態に入るときだけにし、帯の外から入ったときは、前の位置から滑らせずにその場に出す
+						 */
+						@container style(--_has-hocus: --false) {
+							transition-property: inset, opacity;
+							transition-timing-function: step-end, var(--ease--out-quint);
+							transition-behavior: allow-discrete;
+						}
+					}
+				}
+			}
+		}
+
+		/*
+		 * ハイライト（帯の ::before。帯の最初の子として描かれる）より後ろに描くよう、位置を指定した要素にする
+		 * （木の順で重なりを決め、z-index を使わない）
+		 */
+		._buttons {
+			position: relative;
+		}
+
+		/* ボタンは数が決まっていて、帯の 1 行に収まるので、折り返さない */
+		menu {
+			display: block flex;
+		}
+
+		/* ボタンの間は、項目の左右の padding で作り、ポインターが隙間を通る間もどれかの項目の上にあるようにする（no-gaps-between-hover-items） */
+		menu > li {
+			padding-inline: calc(var(--_button-gap) / 2);
+		}
+
+		/*
+		 * 押せないボタンは、スクリプトが aria-disabled="true" にする。disabled と同じ見た目になるよう、両方をまとめて選ぶ（native-and-aria-state-together）。
+		 * ホバーとフォーカスの見た目、ハイライト、押している間の縮みは、押せるボタンにだけ付ける
+		 */
+		button {
 			/* 押せる部分の大きさ。文字と一緒に大きくし、CSS ピクセルの下限も併せて書く（hit-area-min-size） */
 			--_hit-size: max(24px, 24 / 16 * 1rem);
-			--_background--hocus: var(--background--surface);
+
+			/* ボタンを、ポインターかキーボードのフォーカスが指しているか。ツールチップが読む（hocus-via-style-query） */
+			--_is-hocus: --false;
+			--_is-focus-visible: --false;
 
 			/* アイコンの大きさは、Icon の公開プロパティで渡す */
-			--icon--size: 1rem;
+			--icon--size: 1.125rem;
 
 			/* 強制カラーモードでは、アイコンの線をボタンの文字のシステムカラーにする（forced-colors-svg-system-colors） */
 			--icon--forced-color: ButtonText;
 
-			/*
-			 * アイコンとラベルは、折り返すと 1 つのボタンの中身に見えなくなるので、1 行に並べたまま折り返さない
-			 * （flex-wrap-for-variable-items の例外）
-			 */
-			display: block flex;
-			column-gap: 0.375rem;
-			align-items: center;
-			min-inline-size: var(--_hit-size);
+			/* ツールチップの包含ブロックにする */
+			position: relative;
 
-			/* 高さは DESIGN.md の 2.25rem を下限にし、文字が大きくなったら伸ばす（min-block-size-over-fixed-height） */
-			min-block-size: max(2.25rem, var(--_hit-size));
-			padding-inline: 0.875rem;
-			border-color: var(--border--base);
-			border-radius: 0.5rem;
-			background-color: var(--background--base);
-			color: var(--foreground--base);
+			/*
+			 * li の行の高さの分だけ、ボタンの上下に押せない隙間ができないよう、ブロックにする。
+			 * アイコンを正方形の中央に置くため、グリッドにする
+			 */
+			display: block grid;
+			place-items: center;
+			inline-size: 2.25rem;
+			min-inline-size: var(--_hit-size);
+			min-block-size: var(--_hit-size);
+			aspect-ratio: 1;
+
+			/* 強制カラーモードで線が見えるよう、none ではなく透明にする */
+			border-color: transparent;
+
+			/* 帯とボタンの角が同じ中心の円弧になるよう、帯の角丸から内側の余白を引く */
+			border-radius: calc(var(--rounded--control) - var(--_band-padding));
+			color: var(--foreground--muted);
 
 			@media (any-pointer: coarse) {
 				--_hit-size: max(44px, 44 / 16 * 1rem);
 			}
 
+			/* 押せないボタンは、ホバーで色を変えない。ツールチップの名前は、押せないボタンにも出す */
 			@media (any-hover) {
-				&:enabled:hover {
-					background-color: var(--_background--hocus);
+				&:not(:disabled, [aria-disabled='true']):hover {
+					color: var(--foreground--base);
+				}
+
+				&:hover {
+					--_is-hocus: --true;
 				}
 			}
 
 			/*
-			 * 面が変わるのはホバーのときだけなので、ホバーが外れるときも同じ速さで戻す。
+			 * ホバーで色が変わるときと、押している間だけ動かす。無効の切り替えはスクリプトが起こすので、
+			 * トランジションをふだんの状態に書かず、この状態に入るときにだけ効かせる。
 			 * キーボードのフォーカスでは一度に切り替える（no-motion-on-focus-visible）
 			 */
-			&:not(:focus-visible) {
+			&:not(:disabled, [aria-disabled='true'], :focus-visible):is(:hover, :active) {
 				transition-duration: var(--duration--fast);
-				transition-property: background-color;
+				transition-property: color;
 				transition-timing-function: var(--ease--hover);
 
-				/* 押している間の縮みは、動きを減らす設定がないときだけにする（motion-only-with-no-preference） */
 				@media (prefers-reduced-motion: no-preference) {
-					transition-property: background-color, scale;
+					transition-property: color, scale;
 					transition-timing-function: var(--ease--hover), var(--ease--out-quint);
 				}
 			}
 
-			&:focus-visible {
-				background-color: var(--_background--hocus);
-			}
-
-			/* 押している間は縮め、押したことを返す（press-feedback-short） */
-			&:enabled:active {
+			/* 押している間は縮め、押したことを返す。ハイライトはアンカーの配置の大きさのまま残る（press-feedback-short） */
+			&:not(:disabled, [aria-disabled='true']):active {
 				@media (prefers-reduced-motion: no-preference) {
 					scale: 0.97;
 				}
 			}
+
+			&:focus-visible {
+				--_is-hocus: --true;
+				--_is-focus-visible: --true;
+			}
+
+			&:not(:disabled, [aria-disabled='true']):focus-visible {
+				anchor-name: --presenter-timer-hocus;
+				color: var(--foreground--base);
+			}
+
+			/* ハイライトは、ホバーしている項目か、キーボードのフォーカスがある、押せるボタンに重ねる */
+			&:not(:disabled, [aria-disabled='true']):is(menu > li:hover > *) {
+				@media (any-hover) {
+					anchor-name: --presenter-timer-hocus;
+				}
+			}
+
+			/* 押せないことを示す見た目として、アイコンを補助の色の半分の不透明度にする（DESIGN.md の「操作の部分」） */
+			&:is(:disabled, [aria-disabled='true']) {
+				--icon--forced-color: GrayText;
+
+				color: oklch(from var(--foreground--muted) l c h / 50%);
+			}
+
+			/*
+			 * ツールチップは、ボタンの中央の下に出す。帯は画面の上の端にあるので、上ではなく下に出す。
+			 * ボタンを包含ブロックにした絶対配置で置き、アンカーポジショニングに対応しない環境でも同じ位置に出す
+			 * （no-unsupported-layout-features）。動かさないので、中央に寄せる translate は描き直しの負荷にならない
+			 */
+			& > ._tooltip {
+				position: absolute;
+				inset-block-start: calc(100% + 0.375rem);
+				inset-inline-start: 50%;
+				translate: -50% 0;
+			}
+
+			/*
+			 * 帯の右端のボタン（停止）だけは、画面の右端からはみ出さないよう、ツールチップの右端をボタンの右端にそろえる。
+			 * 帯は横書きで並ぶので、右端は行の終わり（inline-end）になる
+			 */
+			&:is(menu > li:last-child > *) > ._tooltip {
+				inset-inline: auto 0;
+				translate: none;
+			}
 		}
 
-		/* 枠の中に置いた文字なので、ハーフレディングを刈る */
-		._reset-label {
+		/* ツールチップの上にポインターが来ても、ボタンのホバーとして扱わない */
+		._tooltip {
+			inline-size: max-content;
+			padding-block: 0.25rem;
+			padding-inline: 0.5rem;
+			border: 1px solid var(--border--base);
+			border-radius: 0.5rem;
+			background-color: var(--background--surface);
+			color: var(--foreground--base);
+			opacity: 0;
 			text-box: trim-both;
+			pointer-events: none;
+
+			@container style(--_is-hocus: --true) {
+				opacity: 1;
+			}
+
+			/* 現れる・消える変化は不透明度だけなので、動きを減らす設定でも残す。キーボードのフォーカスでは一度に出す（no-motion-on-focus-visible） */
+			@container style(--_is-focus-visible: --false) {
+				transition-duration: var(--duration--base);
+				transition-property: opacity;
+				transition-timing-function: var(--ease--out-quint);
+			}
 		}
 	}
 </style>
