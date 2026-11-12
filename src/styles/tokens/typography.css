@@ -1,0 +1,134 @@
+/**
+ * 文字のトークン。値は DESIGN.md の「文字」の表を写す。
+ * プリミティブ（--font-family--*、--font-size--*、
+ * --font-weight--*、--leading--*、--tracking--*）と、
+ * 6つの文字のスタイルごとの組（--text--<スタイル>--*）の2層にし、
+ * コンポーネントからはスタイルの組を参照する
+ * （typography-token-two-layers）。
+ *
+ * 文字の大きさは枠の幅に対する割合（cqi）で持つ。登録しないカスタムプロパティは、値を
+ * 2.5cqi のような書いたままの形で継承するので、cqi は使う要素から見て最も近いコンテナ
+ * （スライドの枠）に対して解決される。そのため、@property で <length> に登録しない。
+ * 登録すると :root で長さに計算され、枠の外の画面の幅で固定されたまま継承される。
+ * 同じ理由で、:root と body の font-size にはこのトークンを当てない。
+ *
+ * @example
+ * font-family: var(--text--title--font-family);
+ * font-size: var(--text--title--font-size);
+ * font-weight: var(--text--title--font-weight);
+ * line-height: var(--text--title--leading);
+ */
+:root {
+	/* ==----------------------------------------------------
+	 * プリミティブ
+	 * ---------------------------------------------------- */
+
+	/*
+	 * 書体。欧文の字形を先に、和文を後に並べ、最後に総称ファミリーを
+	 * 置く（font-family-sans-serif）。和文は、端末の Noto Sans JP
+	 * （Local Noto Sans JP、fonts.css）を先に、Google Fonts の
+	 * Noto Sans JP を後に置く（local-first-font-face）。
+	 * 端末になく、通信もできない場所では、総称ファミリーの和文で出る。
+	 * 等幅の Fragment Mono には和文の字形がないので、コードの中の和文も
+	 * Noto Sans JP で出す
+	 */
+	--font-family--sans-serif: 'Schibsted Grotesk Variable', 'Local Noto Sans JP', 'Noto Sans JP', sans-serif;
+	--font-family--monospace: 'Fragment Mono', 'Local Noto Sans JP', 'Noto Sans JP', monospace;
+
+	/*
+	 * 大きさ。下限は枠の幅の 2.5%（1920 幅で 48px）。1.25% は補助の文字だけに使う
+	 */
+	--font-size--sm: 1.25cqi;
+	--font-size--md: 2.5cqi;
+	--font-size--lg: 4cqi;
+	--font-size--xl: 6cqi;
+	--font-size--xxl: 12cqi;
+
+	/*
+	 * 太さ。Noto Sans JP で読み込むのが 400 と 700 だけなので、
+	 * 2段階にする（font-weight-numeric）
+	 */
+	--font-weight--regular: 400;
+	--font-weight--bold: 700;
+
+	/*
+	 * 行の高さ。tighter は大きな数字だけに使う
+	 */
+	--leading--tighter: 1.1;
+	--leading--tight: 1.3;
+	--leading--snug: 1.4;
+	--leading--normal: 1.5;
+	--leading--relaxed: 1.7;
+	--leading--loose: 1.9;
+
+	/*
+	 * 字間。和文はベタ組みにし、字間を足さない（solid-setting-for-body-text）。
+	 * 詰めるのは大きな欧文の数字、広げるのは大文字のラベルだけ
+	 */
+	--tracking--tight: -0.04em;
+	--tracking--wide: 0.04em;
+
+	/* ==----------------------------------------------------
+	 * 文字のスタイル
+	 * ---------------------------------------------------- */
+
+	/*
+	 * 数値のレイアウトの数字
+	 */
+	--text--number--font-family: var(--font-family--sans-serif);
+	--text--number--font-size: var(--font-size--xxl);
+	--text--number--font-weight: var(--font-weight--bold);
+	--text--number--leading: var(--leading--tighter);
+	--text--number--tracking: var(--tracking--tight);
+
+	/*
+	 * 表紙の題名、主張のレイアウトのキーメッセージ
+	 */
+	--text--display--font-family: var(--font-family--sans-serif);
+	--text--display--font-size: var(--font-size--xl);
+	--text--display--font-weight: var(--font-weight--bold);
+	--text--display--leading: var(--leading--tight);
+
+	/*
+	 * スライドの題名
+	 */
+	--text--title--font-family: var(--font-family--sans-serif);
+	--text--title--font-size: var(--font-size--lg);
+	--text--title--font-weight: var(--font-weight--bold);
+	--text--title--leading: var(--leading--snug);
+
+	/*
+	 * 本文、補足、図の中の文字、引用
+	 */
+	--text--body--font-family: var(--font-family--sans-serif);
+	--text--body--font-size: var(--font-size--md);
+	--text--body--font-weight: var(--font-weight--regular);
+	--text--body--leading: var(--leading--relaxed);
+
+	/*
+	 * コード
+	 */
+	--text--code--font-family: var(--font-family--monospace);
+	--text--code--font-size: var(--font-size--md);
+	--text--code--font-weight: var(--font-weight--regular);
+	--text--code--leading: var(--leading--normal);
+
+	/*
+	 * ページ番号、章のラベル、出典。欧文の大文字にして字間を広げる
+	 */
+	--text--label--font-family: var(--font-family--monospace);
+	--text--label--font-size: var(--font-size--sm);
+	--text--label--font-weight: var(--font-weight--regular);
+	--text--label--leading: var(--leading--normal);
+	--text--label--tracking: var(--tracking--wide);
+
+	/*
+	 * スライドの外に出すスピーカーノート。縦長の画面で枠が小さくなっても
+	 * 読める大きさに保つため、枠に比例させず rem で持つ。
+	 * 枠の外では cqi が画面の幅（svi）で計算されるので、cqi のプリミティブを参照しない
+	 */
+	--text--notes--font-family: var(--font-family--sans-serif);
+	--text--notes--font-size: 1rem;
+	--text--notes--font-weight: var(--font-weight--regular);
+	--text--notes--leading: var(--leading--loose);
+}

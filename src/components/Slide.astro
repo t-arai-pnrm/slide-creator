@@ -1,0 +1,193 @@
+---
+/**
+ * 1 枚のスライド。16:9 の枠（._frame）と、その下のスピーカーノート（._notes）からなる。
+ * ノートの出し分け（縦長の画面で出し、横長の画面で隠す）は CSS で行う。
+ * ノートの slot を渡さないスライドでは、空の領域と中身のないランドマークを出さないよう、._notes を出力しない。
+ */
+interface Props {
+	/** 1 から数えたページ番号。デッキの中で重ならないので、題名の id にも使う */
+	page: number
+	/** デッキ全体の枚数 */
+	total: number
+	/** 章のラベル。枠線の左上の角に、題名の上に置く */
+	chapter?: string | undefined
+}
+
+const { page, total, chapter } = Astro.props
+
+// section を題名で名前付けする（aria-labelledby）には、題名の要素に id が要る。
+// 原稿の側で id を書かせると付け忘れや重なりが起きるので、題名は名前付きの slot で受け、h2 はこのコンポーネントが出す
+const titleId = `slide-${page}-title`
+
+const hasNotes = Astro.slots.has('notes')
+// すべてのスライドのノートが同じ名前だと、ランドマークの一覧で区別できないので、ページ番号を名前に含める
+const notesLabel = `スピーカーノート（${page} / ${total}）`
+---
+
+<section class="slide" aria-labelledby={titleId}>
+	<div class="_frame">
+		<div class="_frame-inner">
+			<hgroup class="_heading">
+				{chapter && <p class="_chapter">{chapter}</p>}
+				<h2 class="_title" id={titleId}><slot name="title" /></h2>
+			</hgroup>
+			<div class="_body">
+				<slot />
+			</div>
+			<p class="_page">{page} / {total}</p>
+		</div>
+	</div>
+	{hasNotes && <aside class="_notes" aria-label={notesLabel}><slot name="notes" /></aside>}
+</section>
+
+<style>
+	@layer components {
+		.slide {
+			/* DESIGN.md の「枠」のとおり、枠を画面の中央に置く */
+			& > ._frame {
+				margin-inline: auto;
+			}
+		}
+
+		.slide + .slide {
+			/* 枠の面と枠の外が同じ色なので、線がないとスライドの境目が見えない */
+			@media screen {
+				border-block-start: 1px solid var(--border--base);
+			}
+
+			@media print {
+				break-before: page;
+			}
+		}
+
+		/*
+		 * 枠の中の大きさは、すべてこのコンテナの幅に対する cqi で決める。
+		 * cqi はコンテナ自身ではなく祖先に対して解決されるので、この要素には
+		 * cqi の padding や gap を書かず、内側を包む ._frame-inner で取る
+		 * （no-padding-on-container）
+		 */
+		._frame {
+			--_ratio: 16 / 9;
+
+			container: --frame / inline-size;
+
+			/* 包む要素を、枠の高さいっぱいに広げる */
+			display: block grid;
+
+			/*
+			 * 画面の幅は、幅が auto のブロックが親の幅を超えないことで受け持つ。
+			 * ここでは画面の高さから決まる上限だけを書く（viewport-units-as-last-resort）
+			 */
+			max-inline-size: calc(100svb * var(--_ratio));
+			aspect-ratio: var(--_ratio);
+			background-color: var(--background--base);
+		}
+
+		/*
+		 * 見えない枠線を padding で、要素の間を gap で取る。
+		 * この要素は枠の子孫なので、cqi は枠の幅に対して解決される
+		 */
+		._frame-inner {
+			display: block grid;
+			reading-flow: grid-rows;
+			grid-template:
+				'--heading' auto
+				'--body' 1fr
+				'--page' auto
+				/ 1fr;
+			row-gap: var(--spacing--md);
+			padding-block: var(--guide--block);
+			padding-inline: var(--guide--inline);
+
+			& > ._heading {
+				grid-area: --heading;
+			}
+
+			& > ._body {
+				grid-area: --body;
+			}
+
+			& > ._page {
+				grid-area: --page;
+				justify-self: end;
+			}
+		}
+
+		._heading {
+			& > ._chapter + ._title {
+				margin-block-start: var(--spacing--xs);
+			}
+		}
+
+		._chapter {
+			color: var(--foreground--muted);
+			font-family: var(--text--label--font-family);
+			font-size: var(--text--label--font-size);
+			font-weight: var(--text--label--font-weight);
+			line-height: var(--text--label--leading);
+
+			/* 枠線の角に文字の上端をそろえるため、ハーフレディングを刈る */
+			text-box: trim-both cap alphabetic;
+			letter-spacing: var(--text--label--tracking);
+			text-transform: uppercase;
+
+			@media (prefers-contrast: more) {
+				color: var(--foreground--base);
+			}
+		}
+
+		._title {
+			font-family: var(--text--title--font-family);
+			font-size: var(--text--title--font-size);
+			font-weight: var(--text--title--font-weight);
+			line-height: var(--text--title--leading);
+		}
+
+		._body {
+			font-family: var(--text--body--font-family);
+			font-size: var(--text--body--font-size);
+			font-weight: var(--text--body--font-weight);
+			line-height: var(--text--body--leading);
+
+			/* 本文は原稿のスロットから入り、クラスを付けられないので、直下の子を選ぶ */
+			& > :global(* + *) {
+				margin-block-start: var(--spacing--sm);
+			}
+		}
+
+		._page {
+			color: var(--foreground--muted);
+			font-family: var(--text--label--font-family);
+			font-size: var(--text--label--font-size);
+			font-weight: var(--text--label--font-weight);
+			line-height: var(--text--label--leading);
+
+			/* 枠線の角に文字の下端をそろえるため、ハーフレディングを刈る */
+			text-box: trim-both cap alphabetic;
+			letter-spacing: var(--text--label--tracking);
+			text-transform: uppercase;
+
+			@media (prefers-contrast: more) {
+				color: var(--foreground--base);
+			}
+		}
+
+		/*
+		 * ノートは枠の外にあり、cqi が画面の幅で計算されるので、rem で書く。
+		 * 横長の画面では枠が画面を占めるので隠し、縦長の画面でだけ枠の下に出す。
+		 * 縦長かどうかは、幅と高さを比べる aspect-ratio で調べる（no-orientation-for-layout）
+		 */
+		._notes {
+			padding-block: 1.5rem;
+			padding-inline: 1rem;
+			font-family: var(--text--notes--font-family);
+			font-size: var(--text--notes--font-size);
+			font-weight: var(--text--notes--font-weight);
+			line-height: var(--text--notes--leading);
+
+			@media print, (aspect-ratio >= 1) {
+				display: none;
+			}
+		}
+	}
+</style>

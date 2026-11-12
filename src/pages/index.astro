@@ -1,13 +1,37 @@
-<!doctype html>
-<html lang="ja">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>slide-creator</title>
-	</head>
-	<body>
-		<main>
-			<h1>slide-creator</h1>
-		</main>
-	</body>
-</html>
+---
+// テーマの土台を確かめるための見本のデッキ。題名と本文の段落だけで作る（レイアウトと図はあとの作業で足す）
+// 最後の 1 枚は、ノートのないスライドを e2e/frame.spec.ts で確かめるため、ノートを書かない
+import Slide from '@/components/Slide.astro'
+import Deck from '@/layouts/Deck.astro'
+
+const total = 4
+---
+
+<Deck title="slide-creator の紹介">
+	<Slide page={1} total={total}>
+		<Fragment slot="title">記事から登壇のスライドを作る</Fragment>
+		<p>slide-creator は、技術記事やマークダウンをもとに、登壇用の HTML のスライドを作るツールです。</p>
+		<p slot="notes">最初に、このツールが何を作るのかを話す。元になるのは、すでに書いた技術記事やマークダウンの原稿。</p>
+	</Slide>
+	<Slide page={2} total={total} chapter="01 Theme">
+		<Fragment slot="title">どの画面でも同じ見た目で映る</Fragment>
+		<p>
+			スライドは 16:9
+			の枠に収め、文字や余白の大きさを枠の幅に対する割合で決めます。プロジェクターでも手元の画面でも、同じ配置で見えます。
+		</p>
+		<p slot="notes">
+			会場のプロジェクターは解像度が分からないことが多い。枠の幅に比例させるので、どの解像度でも同じ配置になると説明する。
+		</p>
+	</Slide>
+	<Slide page={3} total={total}>
+		<Fragment slot="title">説明はスピーカーノートに書く</Fragment>
+		<p>
+			スライドには見せるものだけを置き、話す内容はノートに書きます。縦長の画面では、各スライドの下にノートが出ます。
+		</p>
+		<p slot="notes">いま読んでいるこの文がノートの例。スマートフォンで開くと、スライドの下に出ることを見せる。</p>
+	</Slide>
+	<Slide page={4} total={total}>
+		<Fragment slot="title">1 つの HTML で配れる</Fragment>
+		<p>1 つのデッキを 1 つの HTML にするので、URL を渡せば、あとから一人で読んでもらえます。</p>
+	</Slide>
+</Deck>

@@ -1,0 +1,96 @@
+/**
+ * HTML 要素の既定の見た目と、和文の組版の既定。
+ * base レイヤーに素のセレクタで書き、後のレイヤーのクラス1つで
+ * 上書きできるようにする（no-heavy-specificity-in-global）。
+ * 配置のプロパティは書かない（no-layout-properties-in-base）。
+ * 全称セレクタの min-inline-size: 0 だけは例外にする
+ * （global-min-inline-size-zero）。
+ *
+ * 文字の大きさ、余白、線の太さはここで当てない。cqi のトークンを
+ * ここで当てると、枠の外の画面の幅で長さに計算され、その長さのまま
+ * 子に継承されるため。枠の中の要素で当てる。
+ * line-break: strict、text-autospace、overflow-wrap は、
+ * kiso.css が :root に指定しているので、ここでは書き足さない
+ * （reset-japanese-defaults-on-root）。
+ */
+*,
+::before,
+::after {
+	min-inline-size: 0;
+}
+
+/*
+ * 配色は <meta name="color-scheme"> で切り替えるので、
+ * ここに color-scheme を書かない。書くと meta より優先され、
+ * meta を書き換えても light-dark() の値が切り替わらなくなる
+ */
+:root {
+	background-color: var(--background--base);
+	color: var(--foreground--base);
+	font-family: var(--text--body--font-family);
+	line-height: var(--text--body--leading);
+	text-underline-offset: 25%;
+
+	&:lang(ja) {
+		font-kerning: none;
+	}
+}
+
+/* ルートでカーニングを切っているので、欧文の要素では戻す（kerning-none-on-root） */
+:lang(en) {
+	font-kerning: normal;
+}
+
+/*
+ * 見出しは約物の余白を詰め、文節の区切りで折り返して
+ * 行の長さをそろえる（palt-for-headings、auto-phrase-for-headings）。
+ * 本文はベタ組みのままにする（solid-setting-for-body-text）
+ */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+	font-kerning: normal;
+
+	&:lang(ja) {
+		font-feature-settings: 'palt';
+
+		@supports (word-break: auto-phrase) {
+			text-wrap: balance;
+			word-break: auto-phrase;
+		}
+	}
+
+	&:lang(en) {
+		text-wrap: balance;
+	}
+}
+
+/*
+ * 強調は太さで表し、斜体を使わない（no-italic-for-japanese）。
+ * kiso.css は和文（:lang(ja)）の斜体だけを解除するので、
+ * 欧文の要素でも解除する。太字の中の太字が 700 を超えないよう、
+ * 太さも 700 に固定する。太さは 400 と 700 の2つだけにしているため
+ */
+b,
+strong,
+em {
+	font-weight: var(--font-weight--bold);
+}
+
+i,
+cite,
+em,
+dfn,
+address {
+	font-style: normal;
+}
+
+code,
+kbd,
+samp,
+pre {
+	font-family: var(--text--code--font-family);
+}

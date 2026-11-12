@@ -1,0 +1,20 @@
+/**
+ * スライドのテーマのスタイルの入り口。
+ * レイヤーの順番を宣言し、各ファイルをレイヤーに割り当てる。
+ * @import は Vite がビルドのときに展開する（import-resolved-at-build）。
+ * コンポーネントのスタイルは各 .astro の style 要素に書き、
+ * @layer components { … } で包む。
+ * 先頭の @layer 文は、コンポーネントの style 要素より先に
+ * 出力されるよう、文書の <head> にも書く。
+ */
+@layer tokens, reset, base, vendors, compositions, pages, components, patterns, utilities;
+
+@import url('./tokens/colors.css') layer(tokens);
+@import url('./tokens/typography.css') layer(tokens);
+@import url('./tokens/spacing.css') layer(tokens);
+@import url('./tokens/shapes.css') layer(tokens);
+@import url('./tokens/motion.css') layer(tokens);
+@import url('kiso.css') layer(reset);
+@import url('./base/global.css') layer(base);
+@import url('./vendors/fonts.css') layer(vendors);
+@import url('./utilities/visually-hidden.css') layer(utilities);

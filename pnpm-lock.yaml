@@ -12,9 +12,18 @@ importers:
 
   .:
     dependencies:
+      '@fontsource-variable/schibsted-grotesk':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource/fragment-mono':
+        specifier: 5.3.0
+        version: 5.3.0
       astro:
         specifier: 7.4.5
         version: 7.4.5(@types/node@24.19.2)(yaml@2.9.1)
+      kiso.css:
+        specifier: 1.2.4
+        version: 1.2.4
     devDependencies:
       '@astrojs/check':
         specifier: 0.9.12
@@ -389,6 +398,12 @@ packages:
   '@eslint/plugin-kit@0.7.3':
     resolution: {integrity: sha512-IkO+/KEUvwbVpiURZg+P7zF74z5Jxe0UgJxVni+RtoHQ6IZieXaO02kmadomap/q+l6bc/jdPGGqTjhuZnuz1Q==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
+
+  '@fontsource-variable/schibsted-grotesk@5.3.0':
+    resolution: {integrity: sha512-ndS6H/KICWANchlHF3q4UdZD+xrZ3Ji0rUobIuXlgvDUzDfqZDsVuXPXZb636nJZMHE9zZ9Fmwgqazm8hMB50Q==}
+
+  '@fontsource/fragment-mono@5.3.0':
+    resolution: {integrity: sha512-vpOLZhWq7Z6wUPo1qMl16Y4yjQJiN0d9TXX2oUtiYXmqUrXU23Wuto73Knyak+osdlIuHz46srpBZb2pfhHCIA==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -2027,6 +2042,9 @@ packages:
   kind-of@6.0.3:
     resolution: {integrity: sha512-dcS1ul+9tmeD95T+x28/ehLgd9mENa3LsvDTtzm3vyBEO7RPptvAD+t44WVXaUjTBRcrpFeFlC8WCruUR456hw==}
     engines: {node: '>=0.10.0'}
+
+  kiso.css@1.2.4:
+    resolution: {integrity: sha512-svHtRExh51oRPH9GQ/meutMUeztyFyJHH2YHt7If7fdvOyKImTCGNGIu48BudLouwcMldPz+80R7YBJJRy9aJQ==}
 
   kleur@4.1.5:
     resolution: {integrity: sha512-o+NO+8WrRiQEE4/7nwRJhN1HWpVmJm511pBHUxPLtp0BUISzlBplORYSmTclCnJvQq2tKu/sgl3xVpkc7ZWuQQ==}
@@ -3755,6 +3773,10 @@ snapshots:
       levn: 0.4.1
     optional: true
 
+  '@fontsource-variable/schibsted-grotesk@5.3.0': {}
+
+  '@fontsource/fragment-mono@5.3.0': {}
+
   '@humanfs/core@0.19.2':
     dependencies:
       '@humanfs/types': 0.15.0
@@ -5407,6 +5429,8 @@ snapshots:
       '@keyv/serialize': 1.1.1
 
   kind-of@6.0.3: {}
+
+  kiso.css@1.2.4: {}
 
   kleur@4.1.5: {}
 

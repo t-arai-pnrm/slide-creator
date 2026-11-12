@@ -35,6 +35,7 @@ paths:
   - commit-msg: Conventional Commits の形式を検査する（`git merge` や `git revert` の既定のメッセージは通す）
   - pre-push: `pnpm test`
 - **PR の前の検証**: `scripts/verify.ts`（`pnpm verify`）が、`test`、`build`、`test:html`、`test:e2e` を順に実行し、結果を `.claude/logs/receipts/<ブランチ名>.json` に書く。レビュー係は、この記録の `commit` を HEAD と照らし合わせるので、検査の前後で作業ツリーかコミットが変わると記録を無効（`clean: false`）にする
+- **CSS の対象ブラウザ**: `astro.config.mjs` の `vite.build.cssTarget` は、`.browserslistrc` と同じ範囲を手で書いている。どちらかを変えたら、もう片方も変える。`cssTarget` が古いブラウザを含むと、CSS の圧縮が `light-dark()` を書き換えて明暗の色が無効になる（`e2e/frame.spec.ts` の背景の色のテストで検出する）
 - **依存の安全性**: `pnpm-workspace.yaml` に書く
   - `minimumReleaseAge` で、公開から 1 週間経っていない版は入れない。セキュリティ修正で待てない版は `minimumReleaseAgeExclude` に足す
   - `trustPolicy: no-downgrade` で、provenance が外れた版など、信頼の段階が下がった版を入れない。正当な理由で下がった版は、理由と issue の URL を添えて `trustPolicyExclude` に足す
