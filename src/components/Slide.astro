@@ -1,7 +1,8 @@
 ---
 /**
  * 1 枚のスライド。16:9 の枠（._frame）と、その下のスピーカーノート（._notes）からなる。
- * ノートの出し分け（縦長の画面で出し、横長の画面で隠す）は CSS で行うので、マークアップでは常に出力する。
+ * ノートの出し分け（縦長の画面で出し、横長の画面で隠す）は CSS で行う。
+ * ノートの slot を渡さないスライドでは、空の領域と中身のないランドマークを出さないよう、._notes を出力しない。
  */
 interface Props {
 	/** 1 から数えたページ番号。デッキの中で重ならないので、題名の id にも使う */
@@ -17,6 +18,10 @@ const { page, total, chapter } = Astro.props
 // section を題名で名前付けする（aria-labelledby）には、題名の要素に id が要る。
 // 原稿の側で id を書かせると付け忘れや重なりが起きるので、題名は名前付きの slot で受け、h2 はこのコンポーネントが出す
 const titleId = `slide-${page}-title`
+
+const hasNotes = Astro.slots.has('notes')
+// すべてのスライドのノートが同じ名前だと、ランドマークの一覧で区別できないので、ページ番号を名前に含める
+const notesLabel = `スピーカーノート（${page} / ${total}）`
 ---
 
 <section class="slide" aria-labelledby={titleId}>
@@ -32,9 +37,7 @@ const titleId = `slide-${page}-title`
 			<p class="_page">{page} / {total}</p>
 		</div>
 	</div>
-	<aside class="_notes" aria-label="スピーカーノート">
-		<slot name="notes" />
-	</aside>
+	{hasNotes && <aside class="_notes" aria-label={notesLabel}><slot name="notes" /></aside>}
 </section>
 
 <style>

@@ -1,4 +1,4 @@
-// スライドの枠（16:9、画面に収まる、cqi で決まる文字の大きさ）と、ノートの出し分けと、見出しの構造を確かめる。
+// スライドの枠（16:9、画面に収まる、cqi で決まる文字の大きさ）と、ノートの出し分けと、見出しの構造と、明暗の色を確かめる。
 // 1 枚ずつ表示する操作はまだないので、すべてのスライドを縦に並べた状態で試す
 import { expect, test, type Page } from '@playwright/test'
 
@@ -10,6 +10,8 @@ const BODY_MIN_RATIO = 0.025
 
 const frames = (page: Page) => page.locator('.slide ._frame')
 const notes = (page: Page) => page.locator('.slide ._notes')
+// src/pages/index.astro の見本のデッキは、最後の 1 枚だけノートを書かない
+const slideWithoutNotes = (page: Page) => page.locator('section.slide').last()
 
 // 画面の幅と高さは、スクロールバーを除いた表示領域で測る。スクロールバーの下に枠が隠れると、収まっていないため
 const getViewportSize = (page: Page) =>
@@ -113,4 +115,82 @@ test('文書に h1 が 1 つあり、各スライドが h2 の題名で名前付
 			await expect(slide).toHaveAccessibleName(titleText)
 		}),
 	)
+})
+
+// ノートを書かないスライドに、空の ._notes が出ないことを確かめる。マークアップは画面の向きで変わらないが、
+// 縦長の画面では空の領域として見えてしまうので、両方の向きで試す
+const NOTES_VIEWPORTS = [
+	{ name: '横長の画面', viewport: { width: 1280, height: 720 } },
+	{ name: '縦長の画面', viewport: { width: 375, height: 812 } },
+]
+
+for (const { name, viewport } of NOTES_VIEWPORTS) {
+	test.describe(`${name}（${viewport.width}×${viewport.height}）`, () => {
+		test.use({ viewport })
+
+		test('ノートのないスライドには ._notes がなく、ほかのノートには中身がある', async ({ page }) => {
+			await page.goto('/')
+			await expect(slideWithoutNotes(page).locator('._notes')).toHaveCount(0)
+
+			const texts = await notes(page).allTextContents()
+			expect(texts.length).toBeGreaterThan(0)
+			for (const text of texts) {
+				expect(text.trim()).not.toBe('')
+			}
+		})
+	})
+}
+
+test.describe('縦長の画面でのノートの名前', () => {
+	// 横長の画面ではノートが display: none で、アクセシブルな名前が計算されないので、ノートが見える縦長の画面で試す
+	test.use({ viewport: { width: 375, height: 812 } })
+
+	test('ノートのランドマークの名前に、ページ番号が入る', async ({ page }) => {
+		await page.goto('/')
+		const slides = await page.locator('section.slide').all()
+		const total = slides.length
+		await Promise.all(
+			slides.map(async (slide, index) => {
+				const note = slide.locator('._notes')
+				if ((await note.count()) === 0) return
+				await expect(note).toHaveAccessibleName(`スピーカーノート（${index + 1} / ${total}）`)
+			}),
+		)
+	})
+})
+
+// 明暗のトークン（light-dark()）が CSS の変換で無効になると、背景の色の計算値が透明になる（astro.config.mjs の cssTarget を参照）
+const TRANSPARENT = ['rgba(0, 0, 0, 0)', 'transparent']
+
+const getBackgroundColors = (page: Page) =>
+	page.evaluate(() => {
+		const frame = document.querySelector('.slide ._frame')
+		if (!frame) throw new Error('._frame がない')
+		return {
+			root: getComputedStyle(document.documentElement).backgroundColor,
+			frame: getComputedStyle(frame).backgroundColor,
+		}
+	})
+
+test('明暗のトークンが効き、color-scheme の meta を dark only にすると背景の色が変わる', async ({ page }) => {
+	await page.goto('/')
+	const light = await getBackgroundColors(page)
+	expect(TRANSPARENT).not.toContain(light.root)
+	expect(TRANSPARENT).not.toContain(light.frame)
+
+	await page.evaluate(() => {
+		const meta = document.querySelector('meta[name="color-scheme"]')
+		if (!meta) throw new Error('color-scheme の meta がない')
+		meta.setAttribute('content', 'dark only')
+	})
+	const dark = await getBackgroundColors(page)
+	expect(TRANSPARENT).not.toContain(dark.root)
+	expect(TRANSPARENT).not.toContain(dark.frame)
+	expect(dark.root).not.toBe(light.root)
+	expect(dark.frame).not.toBe(light.frame)
+})
+
+test('文書の題名がデッキの題名になる', async ({ page }) => {
+	await page.goto('/')
+	await expect(page).toHaveTitle('slide-creator の紹介')
 })
