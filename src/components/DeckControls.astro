@@ -1,0 +1,199 @@
+---
+/**
+ * 発表の表示で使う操作の部分（進み具合とボタン）。src/scripts/deck.ts が動かす。
+ * JavaScript が動かない環境と縦に並べて読む形では使えないので、hidden で出力し、発表の表示に入ったときにスクリプトが外す。
+ *
+ * ボタンの名前は文字のラベルだけにし、キーは aria-keyshortcuts で伝える。見せるキーの表示（kbd）まで名前に含めると、
+ * 「ノート N」と読まれ、ショートカットだと分からないため。aria-keyshortcuts のキーの名前は KeyboardEvent.key の値で書く。
+ * 切り替えのボタンの aria-pressed は、スクリプトが今の状態に合わせて書き換える。
+ * テーマのボタンは、「テーマ」のままでは押した状態がライトとダークのどちらを指すか分からないので、押した状態がダークを表すよう「ダーク」と名付ける。
+ *
+ * 文字は枠に比例させず、rem の control のスタイルで書く。置き場所（発表の表示で枠の右下に重ねる）は、置く側の Deck.astro が決める。
+ *
+ * @prop {number} [--deck--progress=0] 進み具合の割合（0 より大きく 1 以下）。スクリプトが文書のルート（html）に書き、継承で受ける
+ */
+---
+
+<section class="deck-controls" aria-label="発表の操作" hidden>
+	<!-- 移動したときに、今の位置を読み上げる -->
+	<p class="_position" aria-live="polite">
+		<span class="-visually-hidden">スライド</span>
+		<span class="_current" data-deck-current>1</span> / <span class="_total" data-deck-total></span>
+	</p>
+	<!-- 進み具合の線。割合は、文書のルート（html）の --deck--progress（0 から 1）で渡す。数は上の文字で伝えるので、読み上げない -->
+	<div class="_progress-line" aria-hidden="true"></div>
+	<menu class="_buttons">
+		<li>
+			<button type="button" class="_button" data-action="prev" aria-keyshortcuts="ArrowLeft PageUp Shift+Space">
+				前へ <kbd class="_key" aria-hidden="true">←</kbd>
+			</button>
+		</li>
+		<li>
+			<button type="button" class="_button" data-action="next" aria-keyshortcuts="ArrowRight PageDown Space">
+				次へ <kbd class="_key" aria-hidden="true">→</kbd>
+			</button>
+		</li>
+		<li>
+			<button type="button" class="_button" data-action="notes" aria-keyshortcuts="N" aria-pressed="false">
+				ノート<kbd class="_key" aria-hidden="true">N</kbd>
+			</button>
+		</li>
+		<li>
+			<button type="button" class="_button" data-action="fullscreen" aria-keyshortcuts="F" aria-pressed="false">
+				全画面<kbd class="_key" aria-hidden="true">F</kbd>
+			</button>
+		</li>
+		<li>
+			<button type="button" class="_button" data-action="presenter" aria-keyshortcuts="P">
+				発表者ビュー<kbd class="_key" aria-hidden="true">P</kbd>
+			</button>
+		</li>
+		<li>
+			<button type="button" class="_button" data-action="theme" aria-keyshortcuts="D" aria-pressed="false">
+				ダーク<kbd class="_key" aria-hidden="true">D</kbd>
+			</button>
+		</li>
+	</menu>
+</section>
+
+<style>
+	@layer components {
+		.deck-controls {
+			--_progress: var(--deck--progress, 0);
+
+			display: block grid;
+			reading-flow: grid-rows;
+			grid-template:
+				'--position --buttons' auto
+				'--progress-line --progress-line' auto
+				/ auto 1fr;
+			column-gap: 0.75rem;
+			align-items: center;
+			padding-inline-start: 0.75rem;
+			border: 1px solid var(--border--base);
+			background-color: var(--background--surface);
+			font-family: var(--text--control--font-family);
+			font-size: var(--text--control--font-size);
+			font-weight: var(--text--control--font-weight);
+			line-height: var(--text--control--leading);
+
+			/*
+			 * 隠れる・現れる動きは、マウスの動きで起こるので、不透明度だけを動かす。
+			 * 位置と大きさは変わらないので、動きを減らす設定でもそのまま残す（motion-only-with-no-preference）
+			 */
+			transition-duration: var(--duration--base);
+			transition-property: opacity;
+			transition-timing-function: var(--ease--out-quint);
+
+			@media print {
+				display: none;
+			}
+
+			/*
+			 * data-idle はスクリプトが付ける（scripting-for-js-dependent-styles）。
+			 * キーボードのフォーカスが中にある間は隠さない。:focus-within にすると、マウスで押したあとも隠れなくなる
+			 * （focus-visible-over-focus-within）。
+			 * 見えないボタンをタップで押してしまわないよう、隠れている間はポインターの操作を下のスライドに通す。
+			 * タップの pointerdown でスクリプトが data-idle を外すので、次のタップからは押せる
+			 */
+			@media (scripting: enabled) {
+				&[data-idle]:not(:has(> ._buttons :focus-visible)) {
+					opacity: 0;
+					pointer-events: none;
+				}
+			}
+
+			& > ._position {
+				grid-area: --position;
+			}
+
+			& > ._progress-line {
+				grid-area: --progress-line;
+			}
+
+			& > ._buttons {
+				grid-area: --buttons;
+			}
+		}
+
+		._position {
+			/* 等幅の書体を読み込めず、和文の書体の数字で出たときにも、数が変わるたびに幅が揺れないようにする */
+			font-variant-numeric: tabular-nums;
+		}
+
+		/*
+		 * 線の長さは割合の幅で決める。動かさないので、幅を変えても描き直しの負荷は問題にならず、
+		 * transform の起点のような物理方向の指定も要らない。
+		 * 線は背景ではなく枠線で描き、強制カラーモードでも見えるようにする
+		 */
+		._progress-line {
+			inline-size: calc(100% * var(--_progress));
+			border-block-start: 1px solid var(--accent--base);
+		}
+
+		/*
+		 * ホバーで面が付くボタンを並べるので、ボタンの間を空けない（no-gaps-between-hover-items）。
+		 * 入りきらない幅では折り返す
+		 */
+		._buttons {
+			display: block flex;
+			flex-wrap: wrap;
+		}
+
+		._button {
+			/* 押せる部分の大きさ。文字と一緒に大きくし、CSS ピクセルの下限も併せて書く（hit-area-min-size） */
+			--_hit-size: max(24px, 24 / 16 * 1rem);
+			--_background--hocus: var(--background--base);
+			--_background--pressed: var(--foreground--base);
+			--_foreground--pressed: var(--background--base);
+			--_foreground--disabled: var(--foreground--muted);
+
+			/* li の行の高さの分だけ、ボタンの上下に押せない隙間ができないよう、ブロックにする */
+			display: block flow;
+			min-inline-size: var(--_hit-size);
+			min-block-size: var(--_hit-size);
+			padding-inline: 0.5rem;
+
+			/* 面のほかに線を足さない。強制カラーモードでは線が見えるよう、none ではなく透明にする */
+			border-color: transparent;
+
+			@media (any-pointer: coarse) {
+				--_hit-size: max(44px, 44 / 16 * 1rem);
+			}
+
+			/*
+			 * 押せないボタン（aria-disabled）と、面の色が反転している押した状態には、ホバーの面を付けない。
+			 * 押した状態の文字は background--base なので、ホバーの面と重なると読めなくなる
+			 */
+			@media (any-hover) {
+				&:enabled:not([aria-disabled='true'], [aria-pressed='true']):hover {
+					background-color: var(--_background--hocus);
+				}
+
+				/*
+				 * ホバーで面が付くときだけ動かす。押した状態と無効の切り替えはキーでも起こるので、
+				 * トランジションをふだんの状態に書かず、この状態に入るときにだけ効かせる。
+				 * キーボードのフォーカスでは一度に切り替える（no-motion-on-focus-visible）
+				 */
+				&:enabled:not([aria-disabled='true'], [aria-pressed='true'], :focus-visible):hover {
+					transition-duration: var(--duration--fast);
+					transition-property: background-color;
+					transition-timing-function: var(--ease--hover);
+				}
+			}
+
+			&:focus-visible:not([aria-disabled='true'], [aria-pressed='true']) {
+				background-color: var(--_background--hocus);
+			}
+
+			&[aria-pressed='true'] {
+				background-color: var(--_background--pressed);
+				color: var(--_foreground--pressed);
+			}
+
+			&[aria-disabled='true'] {
+				color: var(--_foreground--disabled);
+			}
+		}
+	}
+</style>

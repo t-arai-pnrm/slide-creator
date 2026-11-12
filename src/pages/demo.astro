@@ -1,0 +1,107 @@
+---
+// 定例で見せるためのデモのデッキ。taklog の記事「コンテナスタイルクエリでカスタムプロパティをフラグとして扱う」から、
+// 手で作った原稿。/create-slide ができたら、そちらで作り直す
+import Slide from '@/components/Slide.astro'
+import Deck from '@/layouts/Deck.astro'
+
+const total = 11
+---
+
+<Deck title="コンテナスタイルクエリでカスタムプロパティをフラグとして扱う">
+	<Slide page={1} total={total}>
+		<Fragment slot="title">コンテナスタイルクエリでカスタムプロパティをフラグとして扱う</Fragment>
+		<p>Takahiro Arai</p>
+		<p slot="notes">
+			祖先のカスタムプロパティの値を条件にして、子孫のスタイルを切り替える話。幅やホバーの状態を、1
+			か所でフラグに置き換える書き方を紹介する。
+		</p>
+	</Slide>
+
+	<Slide page={2} total={total} chapter="01 Problem">
+		<Fragment slot="title">子要素ごとにサイズクエリを書くと、閾値が散らばる</Fragment>
+		<p>記事カードで、幅に合わせて変えたい子が 3 つあると、同じ閾値の <code>@container</code> が 3 か所に並びます。</p>
+		<p slot="notes">
+			サムネイルを横に並べ、正方形にし、題の文字を大きくする。変えたい子要素ごとのルールにサイズクエリを書くと、同じ
+			calc() の閾値が子の数だけ並ぶ。
+		</p>
+	</Slide>
+
+	<Slide page={3} total={total}>
+		<Fragment slot="title">1 か所でも直し忘れると、中間の状態ができる</Fragment>
+		<p>横並びなのに題の文字は小さいまま、のような、どのデザインにもない見た目になります。</p>
+		<p slot="notes">
+			閾値をカスタムプロパティに入れて共有できればよいが、サイズクエリの条件で var() を使う書き方は、2026 年 11
+			月の時点で対象のブラウザすべてでは使えない。
+		</p>
+	</Slide>
+
+	<Slide page={4} total={total} chapter="02 Mechanism">
+		<Fragment slot="title">スタイルクエリは、祖先のカスタムプロパティの値を条件にする</Fragment>
+		<p><code>@container style(--名前: 値)</code> と書き、計算値が一致するときだけ中のスタイルが当たります。</p>
+		<p slot="notes">
+			サイズクエリは幅を問い、スタイルクエリはカスタムプロパティの値を問う。カスタムプロパティは継承するので、幅を判定した結果を子孫に伝える手段になる。
+		</p>
+	</Slide>
+
+	<Slide page={5} total={total}>
+		<Fragment slot="title">すべての要素が、スタイルクエリのコンテナになる</Fragment>
+		<p><code>container</code> の指定は要りません。名前を付けなければ親を問い合わせ、継承したフラグも読めます。</p>
+		<p slot="notes">
+			仕様では container-type が normal
+			の要素も、スタイルを問い合わせられるコンテナとされている。名前を付けると、その名前を持つ祖先だけが問い合わせ先になるので、内側で立てたフラグが読めなくなる点に注意する。
+		</p>
+	</Slide>
+
+	<Slide page={6} total={total} chapter="03 Pattern">
+		<Fragment slot="title">幅を判定するのは 1 か所、ほかはフラグを読むだけ</Fragment>
+		<p>
+			<code>._layout</code> がサイズクエリで <code>--_density</code> を <code>--spacious</code>
+			に切り替え、子孫はその値を読みます。
+		</p>
+		<p slot="notes">
+			題のルールにも、サムネイルのルールにも閾値が出てこない。狭い幅の見た目はクエリなしで書き、広い幅の見た目だけを
+			style() の中に書く。フラグをルートに置かないのは、コンテナが自分の幅を条件にできないため。
+		</p>
+	</Slide>
+
+	<Slide page={7} total={total}>
+		<Fragment slot="title">ホバーとフォーカスも、フラグにして子孫に配れる</Fragment>
+		<p>行が <code>:has()</code> で子のリンクの状態を受け、<code>--_has-hocus: --true</code> を立てます。</p>
+		<p slot="notes">
+			記事一覧の行は、押せるのが題のリンクだけで、見た目を変えたいのは日付と矢印。子の状態を :has()
+			で親に上げてから、フラグで子孫に配る形になる。
+		</p>
+	</Slide>
+
+	<Slide page={8} total={total} chapter="04 Rules">
+		<Fragment slot="title">値は -- で始まる識別子にし、初期値はクエリの外に書く</Fragment>
+		<p>
+			オンとオフは <code>--true</code> と <code>--false</code> にそろえます。範囲の比較は、Safari
+			が対応するまで使いません。
+		</p>
+		<p slot="notes">
+			スタイルクエリは値の一致しか見ないので、1 と true
+			が混ざってもエラーにならず、条件が成り立たないだけになる。初期値を書かないと、外側のコンポーネントで同じ名前のフラグが立っていたときに、その値を継承してしまう。
+		</p>
+	</Slide>
+
+	<Slide page={9} total={total}>
+		<Fragment slot="title">意味を持つ状態は、HTML の属性で表す</Fragment>
+		<p>フラグは見た目のためのものです。開閉や選択は <code>aria-expanded</code> などで支援技術に伝えます。</p>
+		<p slot="notes">CSS のフラグだけで状態を管理すると、見た目は変わっても、支援技術には何も伝わらない。</p>
+	</Slide>
+
+	<Slide page={10} total={total} chapter="05 Support">
+		<Fragment slot="title">Chrome 111、Safari 18、Firefox 151 で使える</Fragment>
+		<p>2026 年 5 月から、Baseline の「新しく利用可能」です。対応していない環境では、初期値の見た目が残ります。</p>
+		<p slot="notes">
+			子孫の初期値を狭い幅に合わせて書いておけば、対応していない環境では狭い幅の見た目で表示される。幅、ホバー、置き場所、配色と、条件の出どころが違っても同じ形で書ける。
+		</p>
+	</Slide>
+
+	<Slide page={11} total={total}>
+		<Fragment slot="title">出典</Fragment>
+		<p>コンテナスタイルクエリでカスタムプロパティをフラグとして扱う（Takahiro Arai）</p>
+		<p>https://www.tak-dcxi.com/article/how-to-use-container-style-queries/</p>
+	</Slide>
+</Deck>

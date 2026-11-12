@@ -1,5 +1,6 @@
 // スライドの枠（16:9、画面に収まる、cqi で決まる文字の大きさ）と、ノートの出し分けと、見出しの構造と、明暗の色を確かめる。
-// 1 枚ずつ表示する操作はまだないので、すべてのスライドを縦に並べた状態で試す
+// 横長の画面では発表の表示になり、今のスライド以外が hidden で隠れる（e2e/presentation.spec.ts で確かめる）。
+// 枠の大きさと文字の大きさは、隠れたスライドでは 0 になって比べても意味がないので、見えているスライドだけで試す
 import { expect, test, type Page } from '@playwright/test'
 
 const RATIO = 16 / 9
@@ -22,10 +23,12 @@ const getViewportSize = (page: Page) =>
 
 const getFrameSizes = (page: Page) =>
 	frames(page).evaluateAll((elements) =>
-		elements.map((element) => {
-			const { width, height } = element.getBoundingClientRect()
-			return { width, height }
-		}),
+		elements
+			.filter((element) => element.checkVisibility())
+			.map((element) => {
+				const { width, height } = element.getBoundingClientRect()
+				return { width, height }
+			}),
 	)
 
 const LANDSCAPE_VIEWPORTS = [
@@ -84,13 +87,15 @@ test.describe('縦長の画面（375×812）', () => {
 test('本文の段落の文字が、枠の幅の 2.5% 以上の大きさになる', async ({ page }) => {
 	await page.goto('/')
 	const results = await frames(page).evaluateAll((elements) =>
-		elements.flatMap((frame) => {
-			const frameWidth = frame.getBoundingClientRect().width
-			return Array.from(frame.querySelectorAll('._body p'), (paragraph) => ({
-				frameWidth,
-				fontSize: Number.parseFloat(getComputedStyle(paragraph).fontSize),
-			}))
-		}),
+		elements
+			.filter((frame) => frame.checkVisibility())
+			.flatMap((frame) => {
+				const frameWidth = frame.getBoundingClientRect().width
+				return Array.from(frame.querySelectorAll('._body p'), (paragraph) => ({
+					frameWidth,
+					fontSize: Number.parseFloat(getComputedStyle(paragraph).fontSize),
+				}))
+			}),
 	)
 	expect(results.length).toBeGreaterThan(0)
 	for (const { frameWidth, fontSize } of results) {
@@ -99,7 +104,9 @@ test('本文の段落の文字が、枠の幅の 2.5% 以上の大きさにな�
 	}
 })
 
+// 発表の表示では、隠れたスライドが読み上げの対象から外れるので、すべてのスライドが並ぶ縦長の画面で試す
 test('文書に h1 が 1 つあり、各スライドが h2 の題名で名前付けされている', async ({ page }) => {
+	await page.setViewportSize({ width: 375, height: 812 })
 	await page.goto('/')
 	await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1)
 

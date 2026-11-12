@@ -1,0 +1,83 @@
+---
+/**
+ * 発表者ビューの経過時間と、時間を 0 に戻すボタン。src/scripts/deck.ts が、発表者ビューのときだけ hidden を外して動かす。
+ * 経過時間は 1 秒ごとに変わるので、ライブリージョンにしない。読み上げが発表の間ずっと続くため。
+ *
+ * 文字は枠に比例させず、rem の control のスタイルで書く。面と線は、操作の部分（DeckControls）と同じ役割の色にする。
+ * 置き場所（画面の上の端）は、置く側の Deck.astro が HTML の順で決める。
+ */
+---
+
+<div class="presenter-timer" hidden>
+	<p class="_elapsed">
+		<span class="-visually-hidden">経過時間</span>
+		<time datetime="PT0M0S">00:00</time>
+	</p>
+	<button type="button" class="_reset" data-action="reset-timer">時間を 0 に戻す</button>
+</div>
+
+<style>
+	@layer components {
+		.presenter-timer {
+			display: block flex;
+			flex-wrap: wrap;
+			align-items: center;
+			border: 1px solid var(--border--base);
+			background-color: var(--background--surface);
+			font-family: var(--text--control--font-family);
+			font-size: var(--text--control--font-size);
+			font-weight: var(--text--control--font-weight);
+			line-height: var(--text--control--leading);
+
+			/* 経過時間と離し、行の終わりに寄せる（flex-auto-margin-for-end-items） */
+			& > ._reset {
+				margin-inline-start: auto;
+			}
+		}
+
+		._elapsed {
+			/* 等幅の書体を読み込めず、和文の書体の数字で出たときにも、1 秒ごとに幅が揺れないようにする */
+			font-variant-numeric: tabular-nums;
+		}
+
+		/*
+		 * 見た目は操作の部分のボタン（DeckControls の ._button）と同じにする。
+		 * 押した状態と無効の状態は持たない
+		 */
+		._reset {
+			/* 押せる部分の大きさ。文字と一緒に大きくし、CSS ピクセルの下限も併せて書く（hit-area-min-size） */
+			--_hit-size: max(24px, 24 / 16 * 1rem);
+			--_background--hocus: var(--background--base);
+
+			min-inline-size: var(--_hit-size);
+			min-block-size: var(--_hit-size);
+
+			/* 面のほかに線を足さない。強制カラーモードでは線が見えるよう、none ではなく透明にする */
+			border-color: transparent;
+
+			@media (any-pointer: coarse) {
+				--_hit-size: max(44px, 44 / 16 * 1rem);
+			}
+
+			@media (any-hover) {
+				&:enabled:hover {
+					background-color: var(--_background--hocus);
+				}
+			}
+
+			/*
+			 * 面が変わるのはホバーのときだけなので、ホバーが外れるときも同じ速さで戻す。
+			 * キーボードのフォーカスでは一度に切り替える（no-motion-on-focus-visible）
+			 */
+			&:not(:focus-visible) {
+				transition-duration: var(--duration--fast);
+				transition-property: background-color;
+				transition-timing-function: var(--ease--hover);
+			}
+
+			&:focus-visible {
+				background-color: var(--_background--hocus);
+			}
+		}
+	}
+</style>

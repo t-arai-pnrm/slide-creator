@@ -1,9 +1,13 @@
 ---
 /**
  * 1 つのデッキを 1 つの HTML にする骨組み。子に Slide を並べる。
- * 1 枚ずつ表示する操作はまだないので、すべてのスライドを縦に並べてスクロールで読む形を、JavaScript なしで成り立たせる。
+ * HTML としては、すべてのスライドを縦に並べてスクロールで読む形を、JavaScript なしで成り立たせる。
+ * 1 枚ずつ表示する発表の表示と、発表者ビューは、src/scripts/deck.ts が属性を書き換えて作る。
  */
 import '@/styles/index.css'
+import DeckControls from '@/components/DeckControls.astro'
+import PresenterTimer from '@/components/PresenterTimer.astro'
+import { COLOR_SCHEME_STORAGE_KEY, COLOR_SCHEMES } from '@/scripts/theme'
 
 interface Props {
 	/** デッキの題名。<title> と、文書の h1 に使う */
@@ -32,17 +36,78 @@ const { title } = Astro.props
 		<style is:inline>
 			@layer tokens, reset, base, vendors, compositions, pages, components, patterns, utilities;
 		</style>
+		<!--
+			保存したテーマを、最初の描画の前に当てる。モジュールの script は描画のあとに動くので、ライトで描いてからダークに替わり、ちらつくため。
+			markuplint の head-element-order に合わせて head の末尾に置くが、body より前なので描画の前に動く。
+			localStorage は、プライベートブラウズや保存を禁じた設定で例外になるので、そのときは初期値のまま描く
+		-->
+		<script is:inline define:vars={{ storageKey: COLOR_SCHEME_STORAGE_KEY, schemes: COLOR_SCHEMES }}>
+			try {
+				const saved = localStorage.getItem(storageKey)
+				if (schemes.includes(saved)) {
+					document.querySelector('meta[name="color-scheme"]')?.setAttribute('content', saved)
+				}
+			} catch {
+				// 初期値のライトで描く
+			}
+		</script>
 	</head>
 	<body>
+		<!-- 発表者ビューで画面の上の端に置くので、読む順もスライドより前にする -->
+		<PresenterTimer />
 		<main class="deck">
 			<h1 class="_title | -visually-hidden">{title}</h1>
 			<slot />
 		</main>
+		<DeckControls />
+		<script>
+			import { initDeck } from '@/scripts/deck'
+
+			initDeck()
+		</script>
 	</body>
 </html>
 
 <style>
 	@layer components {
+		/*
+		 * 発表の表示では、操作の部分（DeckControls）を、今のスライドの枠の右下に重ねる。
+		 * 置き場所は置く側のこのファイルが決め、DeckControls のルートには位置を書かない（no-external-layout-on-root）。
+		 * 操作の部分は main.deck の外にあり、同じグリッドのエリアに重ねられないので、
+		 * 画面に固定し、Slide.astro と同じ式で枠の右下の位置を求める
+		 */
+		body {
+			&:has(> .deck[data-view='present']) > :global(.deck-controls) {
+				/* Slide.astro の枠の比と、ノートの領域の割合にそろえる */
+				--_ratio: 16 / 9;
+				--_notes-share: 0.3;
+				--_stage-block-size: 100svb;
+
+				/*
+				 * 枠の幅と高さ。幅は、画面に固定した要素の % が画面の幅になる inset-inline-end でだけ使う。
+				 * 高さは上からの位置に使うので、画面の幅を svi で表す。スクロールバーの幅を取る環境では、
+				 * 枠の高さより数 px 大きく見積もる。比は「16 / 9」のまま置き換わるので、割るときは括弧で包む
+				 */
+				--_frame-inline-size: min(100%, var(--_stage-block-size) * var(--_ratio));
+				--_frame-block-size: min(var(--_stage-block-size), 100svi / (var(--_ratio)));
+
+				position: fixed;
+
+				/*
+				 * 枠は、枠を収める高さの中で上下の中央にあるので、下の辺は (収める高さ + 枠の高さ) / 2。
+				 * 下からの位置を % で書くと画面の高さの測り方が枠（svb）と変わるので、
+				 * 上から下の辺までの位置に置き、操作の部分の高さの分だけ上へ戻す
+				 */
+				inset-block-start: calc((var(--_stage-block-size) + var(--_frame-block-size)) / 2);
+				inset-inline-end: calc((100% - var(--_frame-inline-size)) / 2);
+				translate: 0 -100%;
+			}
+
+			&:has(> .deck[data-view='present'][data-notes='shown']) > :global(.deck-controls) {
+				--_stage-block-size: calc(100svb * (1 - var(--_notes-share)));
+			}
+		}
+
 		.deck {
 			/*
 			 * 紙に出すときは、画面の配色にかかわらずライトにする。
@@ -53,6 +118,42 @@ const { title } = Astro.props
 				color-scheme: light;
 				background-color: var(--background--base);
 				color: var(--foreground--base);
+			}
+
+			/*
+			 * 発表の表示。表示するスライドは 1 枚だけなので、画面の高さの中で上下の中央に置く。
+			 * ノートを出したときは、スライドが画面の高さを占め、その中で枠とノートの領域に分かれる（Slide.astro）
+			 */
+			&[data-view='present'] {
+				display: block grid;
+				align-content: center;
+				min-block-size: 100svb;
+
+				/* 横のスワイプはスクリプトが受け、縦のスクロールとピンチでの拡大はブラウザに残す（no-global-touch-action-none） */
+				touch-action: pan-y pinch-zoom;
+			}
+
+			/*
+			 * 発表者ビュー。左に今のスライドの枠を大きく、右の上に次のスライドを小さく、右の下にノートを置く。
+			 * 今のスライドは全体（--stage）に広げ、その中の枠とノートを subgrid で --frame と --notes に置く（Slide.astro）。
+			 * 枠の幅は列の幅で決まり、2fr と 1fr で、今のスライドを次のスライドの 2 倍の幅にする。
+			 * 経過時間（PresenterTimer）と操作の部分は、HTML の順のまま、デッキの上と下に置く
+			 */
+			&[data-view='presenter'] {
+				display: block grid;
+				reading-flow: grid-rows;
+				grid-template:
+					[--stage-start] '--frame --next' auto
+					'--frame --notes' 1fr [--stage-end]
+					/ [--stage-start] 2fr 1fr [--stage-end];
+			}
+
+			&[data-view='presenter'] > :global(.slide[data-slide='current']) {
+				grid-area: --stage;
+			}
+
+			&[data-view='presenter'] > :global(.slide[data-slide='next']) {
+				grid-area: --next;
 			}
 		}
 	}

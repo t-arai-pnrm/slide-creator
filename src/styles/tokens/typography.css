@@ -131,4 +131,13 @@
 	--text--notes--font-size: 1rem;
 	--text--notes--font-weight: var(--font-weight--regular);
 	--text--notes--leading: var(--leading--loose);
+
+	/*
+	 * 操作の部分（ボタンのラベル、進み具合の数字、経過時間）。枠の外に置くので、
+	 * notes と同じく枠に比例させず rem で持ち、cqi のプリミティブを参照しない
+	 */
+	--text--control--font-family: var(--font-family--monospace);
+	--text--control--font-size: calc(14 / 16 * 1rem);
+	--text--control--font-weight: var(--font-weight--regular);
+	--text--control--leading: var(--leading--normal);
 }

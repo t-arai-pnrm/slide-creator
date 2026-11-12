@@ -2,6 +2,8 @@
 /**
  * 1 枚のスライド。16:9 の枠（._frame）と、その下のスピーカーノート（._notes）からなる。
  * ノートの出し分け（縦長の画面で出し、横長の画面で隠す）は CSS で行う。
+ * 発表の表示でノートを出したとき（下の 3 割をノートの領域にする）と、発表者ビュー（枠とノートをデッキのグリッドに置く）の
+ * 見た目は、デッキのルートの data-view と data-notes を祖先の状態として読み、この中に書く。
  * ノートの slot を渡さないスライドでは、空の領域と中身のないランドマークを出さないよう、._notes を出力しない。
  */
 interface Props {
@@ -42,21 +44,71 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 
 <style>
 	@layer components {
+		/*
+		 * 発表の表示と発表者ビューは、デッキのルート（Deck.astro の .deck）の data-view と data-notes で決まる。
+		 * その状態で変わるこのコンポーネントの見た目は、祖先の状態として :global() で読み、このファイルに書く
+		 * （is-for-ancestor-context）。デッキの CSS からは、このコンポーネントのルートの配置だけを決める
+		 */
 		.slide {
-			/* DESIGN.md の「枠」のとおり、枠を画面の中央に置く */
+			/* 発表の表示でノートを出したとき、画面の下の 3 割をノートの領域にする（DESIGN.md の「枠」） */
+			--_notes-share: 0.3;
+
+			/* 枠を収める高さ。ふだんは画面の高さで、ノートの領域を取ったときはその残り */
+			--_stage-block-size: 100svb;
+
+			/*
+			 * 上の残りの高さに枠を、下にノートの領域を置く。枠は上の領域の中で上下の中央に置く。
+			 * 隠したスライドは kiso.css の [hidden] の display: none !important が、この display より勝つ
+			 */
+			&:is(:global(.deck[data-view='present'][data-notes='shown']) > *) {
+				--_stage-block-size: calc(100svb * (1 - var(--_notes-share)));
+
+				display: block grid;
+				reading-flow: grid-rows;
+				grid-template:
+					'--frame' 1fr
+					'--notes' calc(100svb * var(--_notes-share))
+					/ 1fr;
+				align-items: center;
+				min-block-size: 100svb;
+			}
+
+			/*
+			 * 発表者ビューの今のスライドは、デッキのグリッドの全体に置かれる。
+			 * 枠とノートを、デッキの --frame と --notes のエリアに置くため、行と列をデッキから受け継ぐ
+			 */
+			&:is(:global(.deck[data-view='presenter']) > *)[data-slide='current'] {
+				display: block grid;
+				grid-template: subgrid / subgrid;
+			}
+
+			/* DESIGN.md の「枠」のとおり、枠を中央に置く */
 			& > ._frame {
+				grid-area: --frame;
 				margin-inline: auto;
+			}
+
+			/* 上で枠を上下の中央に置く align-items: center を、ノートの領域には当てず、領域の高さいっぱいに広げる */
+			& > ._notes {
+				grid-area: --notes;
+				align-self: stretch;
 			}
 		}
 
 		.slide + .slide {
-			/* 枠の面と枠の外が同じ色なので、線がないとスライドの境目が見えない */
-			@media screen {
-				border-block-start: 1px solid var(--border--base);
-			}
-
 			@media print {
 				break-before: page;
+			}
+
+			/*
+			 * 枠の面と枠の外が同じ色なので、線がないとスライドの境目が見えない。
+			 * 発表の表示と発表者ビューでは、hidden で隠したスライドも兄弟に数えるので、
+			 * 縦に並べる形（data-view がない）に限る
+			 */
+			&:is(:global(.deck:not([data-view])) > *) {
+				@media screen {
+					border-block-start: 1px solid var(--border--base);
+				}
 			}
 		}
 
@@ -75,12 +127,26 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			display: block grid;
 
 			/*
+			 * 発表の表示でノートを出したときと発表者ビューでは、枠はグリッドのアイテムになる。
+			 * グリッドのアイテムは、中央に寄せる margin-inline: auto で中身の幅に縮み、
+			 * 中身の幅を持たないコンテナは幅が 0 になるので、親の幅いっぱいに広げてから上限で抑える
+			 * （no-container-on-intrinsic-size、stretch-over-width-100）
+			 */
+			inline-size: -webkit-fill-available;
+			inline-size: stretch;
+
+			/*
 			 * 画面の幅は、幅が auto のブロックが親の幅を超えないことで受け持つ。
 			 * ここでは画面の高さから決まる上限だけを書く（viewport-units-as-last-resort）
 			 */
-			max-inline-size: calc(100svb * var(--_ratio));
+			max-inline-size: calc(var(--_stage-block-size) * var(--_ratio));
 			aspect-ratio: var(--_ratio);
 			background-color: var(--background--base);
+
+			/* 発表者ビューの次のスライドは、隣の今のスライドと面の色が同じなので、線で区切る */
+			&:is(.slide[data-slide='next'] > *) {
+				border: 1px solid var(--border--base);
+			}
 		}
 
 		/*
@@ -186,6 +252,25 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			line-height: var(--text--notes--leading);
 
 			@media print, (aspect-ratio >= 1) {
+				display: none;
+			}
+
+			/*
+			 * 発表の表示でノートを出したときと発表者ビューでは、画面の向きにかかわらず出す。
+			 * 枠の下か横に別の領域として置くので、面と上の辺の線で枠と区切る。
+			 * 下の 3 割の領域に収まらない長さのノートは、領域の中でスクロールさせる
+			 */
+			&:is(:global(.deck[data-notes='shown']) *) {
+				@media screen {
+					display: block flow;
+					overflow-y: auto;
+					border-block-start: 1px solid var(--border--base);
+					background-color: var(--background--surface);
+				}
+			}
+
+			/* 発表者ビューの次のスライドは、枠だけを見せる。上の指定より後に書いて勝たせる */
+			&:is(.slide[data-slide='next'] *) {
 				display: none;
 			}
 		}

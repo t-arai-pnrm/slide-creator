@@ -1,6 +1,7 @@
 ---
 // テーマの土台を確かめるための見本のデッキ。題名と本文の段落だけで作る（レイアウトと図はあとの作業で足す）
-// 最後の 1 枚は、ノートのないスライドを e2e/frame.spec.ts で確かめるため、ノートを書かない
+// 最後の 1 枚は、ノートのないスライドを e2e/frame.spec.ts で確かめるため、ノートを書かない。
+// また、見えないスライドにフォーカスが移らないことを e2e/presentation.spec.ts で確かめるため、リンクを置く
 import Slide from '@/components/Slide.astro'
 import Deck from '@/layouts/Deck.astro'
 
@@ -33,5 +34,6 @@ const total = 4
 	<Slide page={4} total={total}>
 		<Fragment slot="title">1 つの HTML で配れる</Fragment>
 		<p>1 つのデッキを 1 つの HTML にするので、URL を渡せば、あとから一人で読んでもらえます。</p>
+		<p>ビルドには <a href="https://astro.build/">Astro</a> を使います。</p>
 	</Slide>
 </Deck>
