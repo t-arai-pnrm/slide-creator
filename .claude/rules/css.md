@@ -41,7 +41,7 @@ CSS はスライドの HTML に埋め込まれて配られる。CSS のコメン
 
 ## 文字
 
-- スライドの中の文字のスタイルは `DESIGN.md` の 6 つ（`number`、`display`、`title`、`body`、`code`、`label`）だけを使う。スライドの外のスピーカーノートは `notes`（`rem`）を使う
+- スライドの中の文字のスタイルは `DESIGN.md` の 6 つ（`number`、`display`、`title`、`body`、`code`、`label`）だけを使う。スライドの外は `rem` の 3 つで、スピーカーノートは `notes`、操作の部分のツールチップとタイマーのラベルとボタンは `control`、発表者ビューの経過時間の数字は `timer` を使う
 - 和文に `text-wrap: pretty` は付けない（Safari の不具合）
 - 枠の中に置いた文字（ボタン、ラベル）のハーフレディングは `text-box-trim` で刈る。`text-box-trim` は flex / grid のコンテナには効かないので、その中の文字の要素に付ける
 

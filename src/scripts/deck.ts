@@ -4,6 +4,7 @@
  * 横長の画面で JavaScript が動くときだけ、スライドを 1 枚ずつ表示する（発表の表示）。縦長の画面と、
  * JavaScript が動かない環境では、HTML のとおり縦に並べて読む形のままにする（DESIGN.md の「枠」）。
  * URL に ?presenter が付いていれば、画面の向きにかかわらず発表者ビューにする。
+ * 印刷の間は、すべてのスライドを紙に出すため、どの表示からでも縦に並べる形にする。
  *
  * 状態は、CSS が選べるよう、デッキのルート、スライド、操作の部分の属性で表す。
  * キーで切り替えるものには動きを付けない（DESIGN.md の「動かしてよい場面」）ので、ここでは属性を書き換えるだけにし、
@@ -106,14 +107,20 @@ export const initDeck = (): void => {
 	let view: View = 'scroll'
 	let index = indexFromHash(location.hash, total)
 	let notesShown = false
+	// 印刷の間は、表示を縦に並べる形に替える。kiso.css の [hidden] の display: none !important は印刷でも当たり、
+	// 発表の表示のまま印刷すると、今のスライドしか紙に出ないため。view は替えず、印刷が終われば元の表示に戻す
+	let printing = false
+	/** 画面に出す形。印刷の間だけ、view にかかわらず縦に並べる形にする */
+	const shownView = (): View => (printing ? 'scroll' : view)
 
 	if (totalLabel) totalLabel.textContent = String(total)
 
 	// ---- 今のスライド ----
 
 	const renderSlides = () => {
+		const shown = shownView()
 		slides.forEach((slide, i) => {
-			if (view === 'scroll') {
+			if (shown === 'scroll') {
 				slide.hidden = false
 				slide.inert = false
 				delete slide.dataset.slide
@@ -121,7 +128,7 @@ export const initDeck = (): void => {
 			}
 			const isCurrent = i === index
 			// 発表者ビューでは次のスライドを見せるが、見るだけのものなので操作できないようにする
-			const isNext = view === 'presenter' && i === index + 1
+			const isNext = shown === 'presenter' && i === index + 1
 			// 見えないスライドは hidden で隠す。CSS がなくても、フォーカスと読み上げの対象から外れるため
 			slide.hidden = !isCurrent && !isNext
 			slide.inert = isNext
@@ -179,9 +186,10 @@ export const initDeck = (): void => {
 	// ---- ノート ----
 
 	const renderNotes = () => {
-		if (view === 'scroll') delete deck.dataset.notes
+		const shown = shownView()
+		if (shown === 'scroll') delete deck.dataset.notes
 		// 発表者ビューは、ノートを読むための画面なので常に出す
-		else deck.dataset.notes = view === 'presenter' || notesShown ? 'shown' : 'hidden'
+		else deck.dataset.notes = shown === 'presenter' || notesShown ? 'shown' : 'hidden'
 		button('notes')?.setAttribute('aria-pressed', String(notesShown))
 	}
 
@@ -251,22 +259,27 @@ export const initDeck = (): void => {
 
 	// ---- 表示の切り替え ----
 
-	const setView = (next: View) => {
-		const previous = view
-		view = next
-		if (view === 'scroll') delete deck.dataset.view
-		else deck.dataset.view = view
-		if (controls) controls.hidden = view === 'scroll'
-		if (timer) timer.hidden = view !== 'presenter'
+	const renderView = () => {
+		const shown = shownView()
+		if (shown === 'scroll') delete deck.dataset.view
+		else deck.dataset.view = shown
+		if (controls) controls.hidden = shown === 'scroll'
+		if (timer) timer.hidden = shown !== 'presenter'
 		// 発表者ビューから、さらに発表者ビューを開いたり、ノートを隠したりする意味はないので、ボタンを出さない
 		for (const action of ['notes', 'presenter'] as const) {
 			const element = button(action)
-			if (element) element.hidden = view === 'presenter'
+			if (element) element.hidden = shown === 'presenter'
 		}
 		renderSlides()
 		renderProgress()
 		renderNotes()
 		renderTheme()
+	}
+
+	const setView = (next: View) => {
+		const previous = view
+		view = next
+		renderView()
 		if (view !== 'scroll') {
 			writeHash()
 			wake()
@@ -275,6 +288,26 @@ export const initDeck = (): void => {
 			slides[index]?.scrollIntoView({ block: 'start', behavior: 'instant' })
 		}
 	}
+
+	// ---- 印刷 ----
+
+	const setPrinting = (next: boolean) => {
+		if (printing === next) return
+		printing = next
+		renderView()
+	}
+
+	// beforeprint と afterprint に加え、印刷のメディアへの切り替えも受ける。どちらか一方しか起きない場合にも
+	// 印刷の形にするためで、両方が起きても setPrinting は同じ状態に落ち着く
+	window.addEventListener('beforeprint', () => {
+		setPrinting(true)
+	})
+	window.addEventListener('afterprint', () => {
+		setPrinting(false)
+	})
+	matchMedia('print').addEventListener('change', (event) => {
+		setPrinting(event.matches)
+	})
 
 	// ---- 操作の部分を隠す ----
 
@@ -418,6 +451,8 @@ export const initDeck = (): void => {
 			return
 		}
 		if (isInteractive(event.target)) return
+		// ノートの領域はデッキの中にあるが、ノートをスクロールしたり読んだりするクリックで、スライドを移さない
+		if (event.target instanceof Element && event.target.closest('.slide > ._notes')) return
 		// 文字を選んだ操作は、移動に数えない
 		if (getSelection()?.isCollapsed === false) return
 		const isLeftThird = event.clientX < document.documentElement.clientWidth / 3

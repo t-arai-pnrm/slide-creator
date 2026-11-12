@@ -62,25 +62,31 @@ const flagCode = flagLines.map(([text, mark]) => (mark ? `<span class="-mark">${
 
 	<Slide page={6} total={total} chapter="02 — Mechanism">
 		<Fragment slot="title">幅を判定する場所と、読む場所を分ける</Fragment>
-		<div class="flow">
-			<div class="flow-item -strong">
-				<span class="flow-label">1. 判定する場所</span>
-				<code class="flow-code">._layout</code>
-				<span class="flow-text">サイズクエリで幅を見る</span>
-			</div>
-			<span class="flow-arrow" aria-hidden="true">→</span>
-			<div class="flow-item">
-				<span class="flow-label">2. 伝えるフラグ</span>
-				<code class="flow-code">--_density</code>
-				<span class="flow-text">幅が広いと立てる</span>
-			</div>
-			<span class="flow-arrow" aria-hidden="true">→</span>
-			<div class="flow-item">
-				<span class="flow-label">3. 読む場所</span>
-				<code class="flow-code">style()</code>
-				<span class="flow-text">子孫が値を読む</span>
-			</div>
-		</div>
+		<ol class="flow">
+			<li>
+				<div class="flow-item -strong">
+					<span class="flow-label">1. 判定する場所</span>
+					<code class="flow-code">._layout</code>
+					<span class="flow-text">サイズクエリで幅を見る</span>
+				</div>
+				<span class="flow-arrow" aria-hidden="true">→</span>
+			</li>
+			<li>
+				<div class="flow-item">
+					<span class="flow-label">2. 伝えるフラグ</span>
+					<code class="flow-code">--_density</code>
+					<span class="flow-text">幅が広いと立てる</span>
+				</div>
+				<span class="flow-arrow" aria-hidden="true">→</span>
+			</li>
+			<li>
+				<div class="flow-item">
+					<span class="flow-label">3. 読む場所</span>
+					<code class="flow-code">style()</code>
+					<span class="flow-text">子孫が値を読む</span>
+				</div>
+			</li>
+		</ol>
 		<p slot="notes">
 			サイズクエリを書くのは、フラグを宣言する._layoutのルールだけ。フラグをルートに置かないのは、コンテナが自分の幅を条件にできないため。
 		</p>

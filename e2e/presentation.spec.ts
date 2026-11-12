@@ -183,6 +183,58 @@ test.describe('横長の画面', () => {
 		await expectCurrent(page, 2)
 	})
 
+	test('ノートの領域をクリックしても、スライドを移さない', async ({ page }) => {
+		await page.goto('/#2')
+		await page.keyboard.press('n')
+		const notes = slides(page).nth(1).locator('._notes')
+		await expect(notes).toBeVisible()
+		// 次へ進む側（左の 3 分の 1 の外）をクリックする
+		const box = await notes.boundingBox()
+		if (!box) throw new Error('ノートの領域の位置が取れない')
+		await page.mouse.click(box.x + box.width * 0.8, box.y + box.height / 2)
+		await expectCurrent(page, 2)
+	})
+
+	test('ノートの領域はキーボードでフォーカスでき、名前が付いている', async ({ page }) => {
+		await page.goto('/')
+		await page.keyboard.press('n')
+		const notes = slides(page).first().locator('._notes')
+		await expect(notes).toHaveAttribute('tabindex', '0')
+		await expect(notes).toHaveAccessibleName(`スピーカーノート（1 / ${TOTAL}）`)
+		await notes.focus()
+		await expect(notes).toBeFocused()
+		// フォーカスしたノートの上のスペースは、ノートのスクロールに残し、スライドを移さない
+		await page.keyboard.press('Space')
+		await expectCurrent(page, 1)
+	})
+
+	test('印刷の前に縦に並べた形にしてすべてのスライドを出し、印刷の後に発表の表示に戻す', async ({ page }) => {
+		await page.goto('/#3')
+		await expectCurrent(page, 3)
+
+		await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')))
+		await page.emulateMedia({ media: 'print' })
+		await expect(deck(page)).not.toHaveAttribute('data-view')
+		await expect(page.locator('main.deck > section.slide:is([hidden], [inert], [data-slide])')).toHaveCount(0)
+		const all = await slides(page).all()
+		await Promise.all(all.map((slide) => expect(slide).toBeVisible()))
+
+		await page.emulateMedia({ media: 'screen' })
+		await page.evaluate(() => window.dispatchEvent(new Event('afterprint')))
+		await expect(deck(page)).toHaveAttribute('data-view', 'present')
+		await expectCurrent(page, 3)
+	})
+
+	test('印刷のメディアに替わったときも、すべてのスライドを出す', async ({ page }) => {
+		await page.goto('/#3')
+		await expectCurrent(page, 3)
+		// beforeprint が起きない場合の備えとして、matchMedia('print') の change だけでも切り替わることを確かめる
+		await page.emulateMedia({ media: 'print' })
+		await expect(page.locator('main.deck > section.slide[hidden]')).toHaveCount(0)
+		await page.emulateMedia({ media: 'screen' })
+		await expectCurrent(page, 3)
+	})
+
 	test('N とボタンでノートの状態が切り替わり、aria-pressed が変わる', async ({ page }) => {
 		await page.goto('/')
 		const button = controlButton(page, 'ノート')

@@ -29,6 +29,9 @@ const titleId = `slide-${page}-title`
 const hasNotes = Astro.slots.has('notes')
 // すべてのスライドのノートが同じ名前だと、ランドマークの一覧で区別できないので、ページ番号を名前に含める
 const notesLabel = `スピーカーノート（${page} / ${total}）`
+// ノートの aside には tabindex="0" を付ける。発表の表示と発表者ビューでは長いノートを領域の中でスクロールさせ、
+// スクロールする領域をキーボードで選べないブラウザ（Safari）でも読めるようにするため。
+// 名前のあるランドマークなので、フォーカスしたときに名前が読まれる
 ---
 
 <section class="slide" aria-labelledby={titleId} data-layout={layout}>
@@ -44,7 +47,7 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			<p class="_page">{page} / {total}</p>
 		</div>
 	</div>
-	{hasNotes && <aside class="_notes" aria-label={notesLabel}><slot name="notes" /></aside>}
+	{hasNotes && <aside class="_notes" aria-label={notesLabel} tabindex="0"><slot name="notes" /></aside>}
 </section>
 
 <style>
@@ -252,7 +255,10 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 				}
 			}
 
-			/* 表紙と最後は、題名の上にアクセントの太い線を引く。アクセントはこの 1 か所だけにする */
+			/*
+			 * 表紙と最後は、題名の上にアクセントの太い線を引く。アクセントはこの 1 か所だけにする。
+			 * 題名の幅の上限は、DESIGN.md の「レイアウトの一覧」の、レイアウトごとの幅の上限
+			 */
 			&:is(.slide:is([data-layout='cover'], [data-layout='end']) *) {
 				max-inline-size: 75cqi;
 				padding-block-start: var(--spacing--md);
@@ -353,6 +359,7 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 				align-self: end;
 			}
 
+			/* 主張の補足の幅の上限は、DESIGN.md の「レイアウトの一覧」の、レイアウトごとの幅の上限 */
 			&:is(.slide[data-layout='statement'] *) {
 				max-inline-size: 70cqi;
 			}
@@ -412,6 +419,15 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 
 			@media print, (aspect-ratio >= 1) {
 				display: none;
+			}
+
+			/*
+			 * ノートの領域は画面の端に接するので、外側に描く既定のフォーカスの輪は画面の外に出て見えない。
+			 * 同じ 2 本の線（外側 CanvasText、内側 Canvas、それぞれ 2px）を、要素の内側に寄せて描く
+			 */
+			&:focus-visible {
+				box-shadow: inset 0 0 0 calc(2 * 2px) Canvas;
+				outline-offset: -2px;
 			}
 
 			/*

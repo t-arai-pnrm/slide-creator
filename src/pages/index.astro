@@ -1,11 +1,12 @@
 ---
-// テーマを確かめるための見本のデッキ。DESIGN.md の 11 種類のレイアウトと、定型の図を 1 回ずつ使う
+// テーマを確かめるための見本のデッキ。DESIGN.md の 11 種類のレイアウトと、5 種類の定型の図（流れ、対比、階層、時系列、前と後）を、
+// どれも 1 回以上使う。e2e/content-fit.spec.ts がこのデッキの全スライドを測るので、使っていれば、本文の領域に収まるかが確かめられる。
 // 最後の 1 枚は、ノートのないスライドを e2e/frame.spec.ts で確かめるため、ノートを書かない。
 // また、見えないスライドにフォーカスが移らないことを e2e/presentation.spec.ts で確かめるため、リンクを置く
 import Slide from '@/components/Slide.astro'
 import Deck from '@/layouts/Deck.astro'
 
-const total = 13
+const total = 15
 
 const commandCode = [
 	'<span class="-c"># 記事のURLか、マークダウンのパスを渡す</span>',
@@ -36,22 +37,28 @@ const commandCode = [
 
 	<Slide page={4} total={total} chapter="01 — Flow">
 		<Fragment slot="title">読む、書く、まとめる</Fragment>
-		<div class="flow">
-			<div class="flow-item">
-				<span class="flow-label">1. 読む</span>
-				<span class="flow-text">記事の要点を拾う</span>
-			</div>
-			<span class="flow-arrow" aria-hidden="true">→</span>
-			<div class="flow-item">
-				<span class="flow-label">2. 書く</span>
-				<span class="flow-text">原稿にする</span>
-			</div>
-			<span class="flow-arrow" aria-hidden="true">→</span>
-			<div class="flow-item -strong">
-				<span class="flow-label">3. まとめる</span>
-				<span class="flow-text">HTML 1つにする</span>
-			</div>
-		</div>
+		<ol class="flow">
+			<li>
+				<div class="flow-item">
+					<span class="flow-label">1. 読む</span>
+					<span class="flow-text">記事の要点を拾う</span>
+				</div>
+				<span class="flow-arrow" aria-hidden="true">→</span>
+			</li>
+			<li>
+				<div class="flow-item">
+					<span class="flow-label">2. 書く</span>
+					<span class="flow-text">原稿にする</span>
+				</div>
+				<span class="flow-arrow" aria-hidden="true">→</span>
+			</li>
+			<li>
+				<div class="flow-item -strong">
+					<span class="flow-label">3. まとめる</span>
+					<span class="flow-text">HTMLにビルドする</span>
+				</div>
+			</li>
+		</ol>
 		<p slot="notes">読む係、原稿を書く係、確かめる係をエージェントに分けている。最後にAstroでビルドする。</p>
 	</Slide>
 
@@ -144,7 +151,25 @@ const commandCode = [
 		</p>
 	</Slide>
 
-	<Slide page={10} total={total} layout="quote" chapter="02 — Principle">
+	<Slide page={10} total={total} chapter="02 — Present">
+		<Fragment slot="title">同じHTMLを、横長の画面では1枚ずつ映す</Fragment>
+		<div class="before-after">
+			<div class="figure-box">
+				<span class="flow-label">Before</span>
+				<span class="flow-text">縦に並べて読むだけ</span>
+			</div>
+			<span class="flow-arrow" aria-hidden="true">→</span>
+			<div class="figure-box -strong">
+				<span class="flow-label">After</span>
+				<span class="flow-text">1枚ずつ映して発表する</span>
+			</div>
+		</div>
+		<p slot="notes">
+			最初のテーマは、スライドを縦に並べて読む形だけだった。JavaScriptが動く横長の画面では、1枚ずつの表示に切り替わる。縦長の画面とJavaScriptが動かない環境では、縦に並べた形のまま読める。
+		</p>
+	</Slide>
+
+	<Slide page={11} total={total} layout="quote" chapter="02 — Principle">
 		<Fragment slot="title">スライドを作るときの原則</Fragment>
 		<figure class="quote">
 			<blockquote>
@@ -155,16 +180,41 @@ const commandCode = [
 		<p slot="notes">文章は1枚に5行まで。並ぶ項目は箇条書きにせず、図にする。</p>
 	</Slide>
 
-	<Slide page={11} total={total} layout="number" chapter="02 — Output">
-		<Fragment slot="title">配るのはHTMLファイル1つ</Fragment>
+	<Slide page={12} total={total} layout="number" chapter="02 — Output">
+		<Fragment slot="title">デッキ1本を1つのページで配る</Fragment>
 		<div class="number-block">
 			<span class="numbers-value">1</span>
-			<p>書体もCSSもスクリプトも、1つのファイルに入れる</p>
+			<p>URLを渡せば、ブラウザで読める</p>
 		</div>
-		<p slot="notes">URLを渡せば、あとから一人で読んでもらえる。縦長の画面では、各スライドの下にノートが出る。</p>
+		<p slot="notes">あとから一人で読んでもらえる。縦長の画面では、各スライドの下にノートが出る。</p>
 	</Slide>
 
-	<Slide page={12} total={total} chapter="Source">
+	<Slide page={13} total={total} chapter="02 — Status">
+		<Fragment slot="title">見た目の決まりから先に作っている</Fragment>
+		<ol class="timeline">
+			<li>
+				<span class="flow-label">PR #1</span>
+				<span class="flow-text">DESIGN.mdを書く</span>
+			</li>
+			<li>
+				<span class="flow-label">PR #2</span>
+				<span class="flow-text">テーマと枠を作る</span>
+			</li>
+			<li class="-strong">
+				<span class="flow-label">Now</span>
+				<span class="flow-text">発表の表示を足す</span>
+			</li>
+			<li>
+				<span class="flow-label">Next</span>
+				<span class="flow-text">記事から原稿を作る</span>
+			</li>
+		</ol>
+		<p slot="notes">
+			色や文字の値を先にDESIGN.mdで決め、テーマはそれを写している。記事から原稿を作る/create-slideは、別の作業で作っている。
+		</p>
+	</Slide>
+
+	<Slide page={14} total={total} chapter="Source">
 		<Fragment slot="title">参考にしたもの</Fragment>
 		<ul class="source-list">
 			<li>
@@ -182,7 +232,7 @@ const commandCode = [
 		</ul>
 	</Slide>
 
-	<Slide page={13} total={total} layout="end" chapter="Thank you">
+	<Slide page={15} total={total} layout="end" chapter="Thank you">
 		<Fragment slot="title">記事を書けば、スライドもできる</Fragment>
 		<p>Takahiro Arai / ビルドには<a href="https://astro.build/">Astro</a>を使う</p>
 	</Slide>
