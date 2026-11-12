@@ -14,6 +14,7 @@
 @import url('./tokens/spacing.css') layer(tokens);
 @import url('./tokens/shapes.css') layer(tokens);
 @import url('./tokens/motion.css') layer(tokens);
+@import url('./tokens/z-index.css') layer(tokens);
 @import url('kiso.css') layer(reset);
 @import url('./base/global.css') layer(base);
 @import url('./base/keyframes.css') layer(base);

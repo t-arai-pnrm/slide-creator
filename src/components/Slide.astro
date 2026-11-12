@@ -5,6 +5,9 @@
  * 発表の表示でノートを出したとき（下の 3 割をノートの領域にする）と、発表者ビュー（枠とノートをデッキのグリッドに置く）の
  * 見た目は、デッキのルートの data-view と data-notes を祖先の状態として読み、この中に書く。
  * ノートの slot を渡さないスライドでは、空の領域と中身のないランドマークを出さないよう、._notes を出力しない。
+ *
+ * @prop {length} [--slide--stage-block-size=100svb] 枠を収める高さ。枠の幅の上限を、この高さと 16:9 の比から決める。
+ *   発表者ビューでは、置く側のデッキが、枠を置くグリッドの行の高さを渡す
  */
 interface Props {
 	/** 1 から数えたページ番号。デッキの中で重ならないので、題名の id にも使う */
@@ -29,8 +32,9 @@ const titleId = `slide-${page}-title`
 const hasNotes = Astro.slots.has('notes')
 // すべてのスライドのノートが同じ名前だと、ランドマークの一覧で区別できないので、ページ番号を名前に含める
 const notesLabel = `スピーカーノート（${page} / ${total}）`
-// ノートの aside には tabindex="0" を付ける。発表の表示と発表者ビューでは長いノートを領域の中でスクロールさせ、
-// スクロールする領域をキーボードで選べないブラウザ（Safari）でも読めるようにするため。
+// ノートの aside の tabindex="0" は、src/scripts/deck.ts が、発表の表示と発表者ビューの今のスライドのノートにだけ付ける。
+// その 2 つの表示では長いノートを領域の中でスクロールさせ、スクロールする領域をキーボードで選べないブラウザ（Safari）でも
+// 読めるようにするため。縦に並べる形では付けない。スライドごとに Tab の止まる場所が増えるため。
 // 名前のあるランドマークなので、フォーカスしたときに名前が読まれる
 ---
 
@@ -47,7 +51,7 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			<p class="_page">{page} / {total}</p>
 		</div>
 	</div>
-	{hasNotes && <aside class="_notes" aria-label={notesLabel} tabindex="0"><slot name="notes" /></aside>}
+	{hasNotes && <aside class="_notes" aria-label={notesLabel}><slot name="notes" /></aside>}
 </section>
 
 <style>
@@ -62,7 +66,7 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			--_notes-share: 0.3;
 
 			/* 枠を収める高さ。ふだんは画面の高さで、ノートの領域を取ったときはその残り */
-			--_stage-block-size: 100svb;
+			--_stage-block-size: var(--slide--stage-block-size, 100svb);
 
 			/* スライドが替わったときに要素を順に出す間隔（DESIGN.md の「動かしてよい場面」） */
 			--_stagger: var(--duration--stagger);
@@ -161,8 +165,8 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			aspect-ratio: var(--_ratio);
 			background-color: var(--background--base);
 
-			/* 発表者ビューの次のスライドは、隣の今のスライドと面の色が同じなので、線で区切る */
-			&:is(.slide[data-slide='next'] > *) {
+			/* 発表者ビューの前と次のスライドは、今のスライドや互いと面の色が同じなので、線で区切る */
+			&:is(.slide:is([data-slide='prev'], [data-slide='next']) > *) {
 				border: 1px solid var(--border--base);
 			}
 
@@ -236,10 +240,11 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 
 		._heading {
 			/*
-			 * 発表の表示でスライドが替わったら、題名、題名の下の線、本文の要素の順に出す（DESIGN.md の「動かしてよい場面」）。
+			 * 発表の表示でスライドが替わったら、題名を出し、その 1 つ後に、題名の下の線と本文の要素を同時に出し始める
+			 * （DESIGN.md の「動かしてよい場面」）。
 			 * 隠したスライドは display: none なので、表示に戻るたびにアニメーションが最初から再生される。
 			 * そのため、スクリプトで始め直す処理は要らない。
-			 * 縦に並べて読む形と、発表者ビューの次のスライドは動かさない。
+			 * 縦に並べて読む形と、発表者ビュー（今、前、次のスライド）は動かさない。
 			 * 移動は動きを減らす設定では外し、不透明度の変化だけを残す（motion-only-with-no-preference）
 			 */
 			&:is(:global(.deck[data-view='present']) > .slide[data-slide='current'] *) {
@@ -370,7 +375,7 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			}
 		}
 
-		/* 本文の要素は、題名の 1 つ後に出す（._heading の動きと同じ条件） */
+		/* 本文の要素は、題名の 1 つ後に、題名の下の線と同時に出す（._heading の動きと同じ条件） */
 		._body > :global(*) {
 			&:is(:global(.deck[data-view='present']) > .slide[data-slide='current'] *) {
 				--translate-from--y-value: var(--distance--enter);
@@ -424,6 +429,7 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			/*
 			 * ノートの領域は画面の端に接するので、外側に描く既定のフォーカスの輪は画面の外に出て見えない。
 			 * 同じ 2 本の線（外側 CanvasText、内側 Canvas、それぞれ 2px）を、要素の内側に寄せて描く
+			 * （DESIGN.md の「操作の部分」の、フォーカスの輪の決まり）
 			 */
 			&:focus-visible {
 				box-shadow: inset 0 0 0 calc(2 * 2px) Canvas;
@@ -444,8 +450,8 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 				}
 			}
 
-			/* 発表者ビューの次のスライドは、枠だけを見せる。上の指定より後に書いて勝たせる */
-			&:is(.slide[data-slide='next'] *) {
+			/* 発表者ビューの前と次のスライドは、枠だけを見せる。上の指定より後に書いて勝たせる */
+			&:is(.slide:is([data-slide='prev'], [data-slide='next']) *) {
 				display: none;
 			}
 		}

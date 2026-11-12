@@ -23,7 +23,16 @@ const PRESENTER_PARAM = 'presenter'
 const PRESENTER_WINDOW_NAME = 'slide-creator-presenter'
 
 type View = 'scroll' | 'present' | 'presenter'
-type Action = 'prev' | 'next' | 'notes' | 'fullscreen' | 'presenter' | 'theme' | 'reset-timer'
+type Action =
+	| 'prev'
+	| 'next'
+	| 'notes'
+	| 'fullscreen'
+	| 'presenter'
+	| 'theme'
+	| 'timer-play'
+	| 'timer-pause'
+	| 'timer-stop'
 
 interface SlideMessage {
 	type: 'slide'
@@ -79,6 +88,13 @@ const formatElapsed = (ms: number) => {
 	}
 }
 
+/** ノートの領域（とその中）か。ノートは今のスライドで tabindex を持ち、フォーカスしてスクロールする */
+const isInNotes = (target: EventTarget | null) =>
+	target instanceof Element && target.closest('.slide > ._notes') !== null
+
+/** ノートの中では、ノートのスクロールに残すキー。ページ単位のスクロールと、端までのスクロールに使う */
+const NOTES_SCROLL_KEYS: ReadonlySet<string> = new Set(['PageDown', 'PageUp', 'Home', 'End'])
+
 const queryHTMLElement = (root: ParentNode, selector: string) => {
 	const element = root.querySelector(selector)
 	return element instanceof HTMLElement ? element : null
@@ -127,14 +143,24 @@ export const initDeck = (): void => {
 				return
 			}
 			const isCurrent = i === index
-			// 発表者ビューでは次のスライドを見せるが、見るだけのものなので操作できないようにする
+			// 発表者ビューでは前と次のスライドを見せるが、見るだけのものなので操作できないようにする
+			const isPrev = shown === 'presenter' && i === index - 1
 			const isNext = shown === 'presenter' && i === index + 1
 			// 見えないスライドは hidden で隠す。CSS がなくても、フォーカスと読み上げの対象から外れるため
-			slide.hidden = !isCurrent && !isNext
-			slide.inert = isNext
+			slide.hidden = !isCurrent && !isPrev && !isNext
+			slide.inert = isPrev || isNext
 			if (isCurrent) slide.dataset.slide = 'current'
+			else if (isPrev) slide.dataset.slide = 'prev'
 			else if (isNext) slide.dataset.slide = 'next'
 			else delete slide.dataset.slide
+		})
+		// ノートの tabindex="0" は、長いノートを領域の中でスクロールさせる表示（発表の表示と発表者ビュー）の、今のスライドにだけ付ける。
+		// 縦に並べる形で付けると、ノートのあるスライドごとに Tab の止まる場所が増えるため（src/components/Slide.astro）
+		slides.forEach((slide, i) => {
+			const notes = queryHTMLElement(slide, ':scope > ._notes')
+			if (!notes) return
+			if (shown !== 'scroll' && i === index) notes.tabIndex = 0
+			else notes.removeAttribute('tabindex')
 		})
 	}
 
@@ -178,9 +204,20 @@ export const initDeck = (): void => {
 		goTo(event.data.page - 1, { broadcast: false })
 	})
 
+	/** 縦に並べる形で、今のスライドまでスクロールする。スライドに id はないので、ブラウザはハッシュの位置へ動かさない */
+	const scrollToCurrent = () => {
+		slides[index]?.scrollIntoView({ block: 'start', behavior: 'instant' })
+	}
+
 	// アドレスバーでハッシュを書き換えたときも、そのスライドへ移る
 	window.addEventListener('hashchange', () => {
-		if (view !== 'scroll') goTo(indexFromHash(location.hash, total))
+		const next = indexFromHash(location.hash, total)
+		if (view !== 'scroll') {
+			goTo(next)
+			return
+		}
+		index = next
+		scrollToCurrent()
 	})
 
 	// ---- ノート ----
@@ -226,7 +263,12 @@ export const initDeck = (): void => {
 		window.open(url, PRESENTER_WINDOW_NAME, 'popup')
 	}
 
-	let timerStart = Date.now()
+	// 経過時間は、一時停止までに数えた分と、今動いている区間（始めた時刻から今まで）の和で持つ。
+	// 1 秒ごとに足していくと、setInterval の遅れが積もるため
+	let timerCounted = 0
+	/** 動いている区間を始めた時刻。止まっている間は null */
+	let timerRunningSince: number | null = null
+	const timerElapsed = () => timerCounted + (timerRunningSince === null ? 0 : Date.now() - timerRunningSince)
 	const elapsed = timer ? queryHTMLElement(timer, 'time') : null
 	const timerDigits = timer
 		? Array.from(timer.querySelectorAll('[data-timer-digit]')).filter(
@@ -235,7 +277,7 @@ export const initDeck = (): void => {
 		: []
 
 	const renderTimer = () => {
-		const { digits, text, datetime } = formatElapsed(Date.now() - timerStart)
+		const { digits, text, datetime } = formatElapsed(timerElapsed())
 		if (elapsed) {
 			elapsed.textContent = text
 			elapsed.setAttribute('datetime', datetime)
@@ -245,8 +287,34 @@ export const initDeck = (): void => {
 		})
 	}
 
-	const resetTimer = () => {
-		timerStart = Date.now()
+	/** 今の状態で押せないボタンを aria-disabled にする */
+	const renderTimerButtons = () => {
+		const running = timerRunningSince !== null
+		const atZero = !running && timerCounted === 0
+		button('timer-play')?.setAttribute('aria-disabled', String(running))
+		button('timer-pause')?.setAttribute('aria-disabled', String(!running))
+		button('timer-stop')?.setAttribute('aria-disabled', String(atZero))
+	}
+
+	const playTimer = () => {
+		if (timerRunningSince !== null) return
+		timerRunningSince = Date.now()
+		renderTimerButtons()
+		renderTimer()
+	}
+
+	const pauseTimer = () => {
+		if (timerRunningSince === null) return
+		timerCounted = timerElapsed()
+		timerRunningSince = null
+		renderTimerButtons()
+		renderTimer()
+	}
+
+	const stopTimer = () => {
+		timerCounted = 0
+		timerRunningSince = null
+		renderTimerButtons()
 		renderTimer()
 	}
 
@@ -285,7 +353,7 @@ export const initDeck = (): void => {
 			wake()
 		} else if (previous !== 'scroll') {
 			// 縦に並べる形に戻ったとき、発表の表示で見ていたスライドから読めるようにする
-			slides[index]?.scrollIntoView({ block: 'start', behavior: 'instant' })
+			scrollToCurrent()
 		}
 	}
 
@@ -364,13 +432,29 @@ export const initDeck = (): void => {
 				toggleColorScheme()
 				renderTheme()
 				break
-			case 'reset-timer':
-				resetTimer()
+			case 'timer-play':
+				playTimer()
+				break
+			case 'timer-pause':
+				pauseTimer()
+				break
+			case 'timer-stop':
+				stopTimer()
 				break
 		}
 	}
 
-	const ACTIONS: readonly Action[] = ['prev', 'next', 'notes', 'fullscreen', 'presenter', 'theme', 'reset-timer']
+	const ACTIONS: readonly Action[] = [
+		'prev',
+		'next',
+		'notes',
+		'fullscreen',
+		'presenter',
+		'theme',
+		'timer-play',
+		'timer-pause',
+		'timer-stop',
+	]
 	const isAction = (value: unknown): value is Action => ACTIONS.some((action) => action === value)
 
 	document.addEventListener('click', (event) => {
@@ -386,6 +470,9 @@ export const initDeck = (): void => {
 		// Ctrl、Cmd、Alt との組み合わせは、ブラウザと OS のショートカットに残す
 		if (event.defaultPrevented || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return
 		if (isEditable(event.target)) return
+		// フォーカスしたノートの中では、ページ単位と端までのスクロールのキーを、長いノートのスクロールに残す。
+		// 左右の矢印はノートの横のスクロールに使わないので、スライドの移動のままにする
+		if (isInNotes(event.target) && NOTES_SCROLL_KEYS.has(event.key)) return
 
 		let action: Action | 'first' | 'last' | undefined
 		switch (event.key) {
@@ -464,10 +551,12 @@ export const initDeck = (): void => {
 	if (isPresenter) {
 		// 表示は経過時間から毎回計算するので、間隔がずれても表示の誤差は積もらない
 		setInterval(renderTimer, 1000)
-		resetTimer()
+		stopTimer()
 		setView('presenter')
 	} else {
 		setView(landscape.matches ? 'present' : 'scroll')
+		// 縦に並べる形で #3 のように開いたときは、そのスライドから読めるようにする
+		if (view === 'scroll' && location.hash !== '') scrollToCurrent()
 		landscape.addEventListener('change', (event) => {
 			setView(event.matches ? 'present' : 'scroll')
 		})

@@ -33,6 +33,9 @@ const expectCurrent = async (page: Page, pageNumber: number) => {
 	await expect(controls(page).locator('[data-deck-current]')).toHaveText(String(pageNumber))
 }
 
+const timerButton = (page: Page, name: string) =>
+	page.locator('.presenter-timer').getByRole('button', { name, exact: true })
+
 /** 経過時間のテストで固定する時刻。値に意味はなく、ずらした分だけが経過時間になる */
 const TIMER_START = Date.UTC(2026, 0, 1)
 
@@ -193,17 +196,42 @@ test.describe('横長の画面', () => {
 		await expectCurrent(page, 2)
 	})
 
-	test('ノートの領域はキーボードでフォーカスでき、名前が付いている', async ({ page }) => {
+	test('今のスライドのノートだけがキーボードでフォーカスでき、名前が付いている', async ({ page }) => {
 		await page.goto(DECK_PATH)
 		await page.keyboard.press('n')
 		const notes = slides(page).first().locator('._notes')
 		await expect(notes).toHaveAttribute('tabindex', '0')
 		await expect(notes).toHaveAccessibleName(`スピーカーノート（1 / ${TOTAL}）`)
+		// 今のスライドのほかは、Tab の止まる場所にしない
+		await expect(page.locator('main.deck > section.slide > ._notes[tabindex]')).toHaveCount(1)
 		await notes.focus()
 		await expect(notes).toBeFocused()
 		// フォーカスしたノートの上のスペースは、ノートのスクロールに残し、スライドを移さない
 		await page.keyboard.press('Space')
 		await expectCurrent(page, 1)
+
+		// 移ると、移った先のスライドのノートに付け替える
+		await page.keyboard.press('ArrowRight')
+		await expectCurrent(page, 2)
+		await expect(slides(page).nth(1).locator('._notes')).toHaveAttribute('tabindex', '0')
+		await expect(notes).not.toHaveAttribute('tabindex')
+		await expect(page.locator('main.deck > section.slide > ._notes[tabindex]')).toHaveCount(1)
+	})
+
+	test('ノートにフォーカスがあるときの Page Up / Page Down と Home / End は、スライドを移さない', async ({ page }) => {
+		await page.goto(`${DECK_PATH}#2`)
+		await page.keyboard.press('n')
+		const notes = slides(page).nth(1).locator('._notes')
+		await notes.focus()
+		await page.keyboard.press('PageDown')
+		await page.keyboard.press('End')
+		await page.keyboard.press('PageUp')
+		await page.keyboard.press('Home')
+		await expectCurrent(page, 2)
+		// 左右の矢印は、ノートの中でもスライドを移す
+		await notes.focus()
+		await page.keyboard.press('ArrowRight')
+		await expectCurrent(page, 3)
 	})
 
 	test('印刷の前に縦に並べた形にしてすべてのスライドを出し、印刷の後に発表の表示に戻す', async ({ page }) => {
@@ -281,6 +309,24 @@ test.describe('横長の画面', () => {
 		await expect(colorScheme(page)).toHaveAttribute('content', 'light only')
 		await page.reload()
 		await expect(colorScheme(page)).toHaveAttribute('content', 'light only')
+	})
+
+	test('ほかのウィンドウでテーマを切り替えると、このウィンドウにも写る', async ({ context }) => {
+		const first = await context.newPage()
+		await first.setViewportSize(LANDSCAPE)
+		await first.goto(DECK_PATH)
+		const second = await context.newPage()
+		await second.setViewportSize(LANDSCAPE)
+		await second.goto(DECK_PATH)
+		await expect(colorScheme(second)).toHaveAttribute('content', 'light only')
+
+		await first.keyboard.press('d')
+		await expect(colorScheme(first)).toHaveAttribute('content', 'dark only')
+		await expect(colorScheme(second)).toHaveAttribute('content', 'dark only')
+		await expect(controlButton(second, 'ダーク')).toHaveAttribute('aria-pressed', 'true')
+
+		await first.keyboard.press('d')
+		await expect(colorScheme(second)).toHaveAttribute('content', 'light only')
 	})
 
 	test('localStorage が使えなくても、テーマを切り替えられる', async ({ page }) => {
@@ -439,6 +485,23 @@ test.describe('縦長の画面', () => {
 		await expectScrollView(page)
 	})
 
+	test('ノートは Tab の止まる場所にしない', async ({ page }) => {
+		await page.goto(DECK_PATH)
+		await expect(page.locator('main.deck > section.slide > ._notes').first()).toBeVisible()
+		await expect(page.locator('main.deck > section.slide > ._notes[tabindex]')).toHaveCount(0)
+	})
+
+	test('#3 で開くと 3 枚目までスクロールし、ハッシュを変えるとそのスライドまでスクロールする', async ({ page }) => {
+		await page.goto(`${DECK_PATH}#3`)
+		await expect(slides(page).nth(2)).toBeInViewport()
+		await expect(slides(page).first()).not.toBeInViewport()
+		await page.evaluate(() => {
+			location.hash = '#5'
+		})
+		await expect(slides(page).nth(4)).toBeInViewport()
+		await expect(slides(page).nth(2)).not.toBeInViewport()
+	})
+
 	test('キーでスライドを移さず、ハッシュも書き換えない', async ({ page }) => {
 		await page.goto(DECK_PATH)
 		await page.keyboard.press('ArrowRight')
@@ -460,18 +523,30 @@ test.describe('JavaScript が動かない環境（横長の画面）', () => {
 test.describe('発表者ビュー', () => {
 	test.use({ viewport: LANDSCAPE })
 
-	test('今のスライドと次のスライドを属性で示し、次のスライドは操作できない', async ({ page }) => {
+	test('今のスライドと前と次のスライドを属性で示し、前と次のスライドは操作できない', async ({ page }) => {
 		await page.goto(`${DECK_PATH}?presenter#2`)
 		await expect(deck(page)).toHaveAttribute('data-view', 'presenter')
 		await expect(deck(page)).toHaveAttribute('data-notes', 'shown')
+		await expect(slides(page).nth(0)).toHaveAttribute('data-slide', 'prev')
 		await expect(slides(page).nth(1)).toHaveAttribute('data-slide', 'current')
 		await expect(slides(page).nth(2)).toHaveAttribute('data-slide', 'next')
+		await expect(slides(page).nth(0)).toHaveJSProperty('inert', true)
 		await expect(slides(page).nth(2)).toHaveJSProperty('inert', true)
 		await expect(slides(page).nth(1)).toHaveJSProperty('inert', false)
-		await expect(page.locator('main.deck > section.slide:not([hidden])')).toHaveCount(2)
+		await expect(page.locator('main.deck > section.slide:not([hidden])')).toHaveCount(3)
+		// ノートを読むのは今のスライドだけなので、前と次のスライドのノートは Tab の止まる場所にしない
+		await expect(slides(page).nth(1).locator('._notes')).toHaveAttribute('tabindex', '0')
+		await expect(page.locator('main.deck > section.slide > ._notes[tabindex]')).toHaveCount(1)
 		// 発表者ビューでは、ノートを隠すボタンと、さらに発表者ビューを開くボタンを出さない
 		await expect(controls(page).locator('[data-action="notes"]')).toBeHidden()
 		await expect(controls(page).locator('[data-action="presenter"]')).toBeHidden()
+	})
+
+	test('最初のスライドでは、前のスライドがない', async ({ page }) => {
+		await page.goto(`${DECK_PATH}?presenter#1`)
+		await expect(slides(page).nth(0)).toHaveAttribute('data-slide', 'current')
+		await expect(slides(page).nth(1)).toHaveAttribute('data-slide', 'next')
+		await expect(page.locator('[data-slide="prev"]')).toHaveCount(0)
 	})
 
 	test('最後のスライドでは、次のスライドがない', async ({ page }) => {
@@ -480,13 +555,73 @@ test.describe('発表者ビュー', () => {
 		await expect(page.locator('[data-slide="next"]')).toHaveCount(0)
 	})
 
+	// 16:10 と 16:9 の画面で、経過時間、デッキ、操作の部分が画面の高さに収まり、ノートが操作の部分のすぐ上まで届く（DESIGN.md の「発表者ビュー」）
+	for (const viewport of [
+		{ width: 1440, height: 900 },
+		{ width: 1280, height: 800 },
+		{ width: 1280, height: 720 },
+		{ width: 1920, height: 1080 },
+	]) {
+		test(`${viewport.width}×${viewport.height} で、枠が画面に収まり、ノートが下の端まで届く`, async ({ page }) => {
+			await page.setViewportSize(viewport)
+			await page.goto(`${DECK_PATH}?presenter#2`)
+			await expect(deck(page)).toHaveAttribute('data-view', 'presenter')
+			const rem = await page.evaluate(() => Number.parseFloat(getComputedStyle(document.documentElement).fontSize))
+			const box = async (selector: string) => {
+				const found = await page.locator(selector).boundingBox()
+				if (!found) throw new Error(`${selector} の位置が取れない`)
+				return found
+			}
+			const notes = await box('.slide[data-slide="current"] > ._notes')
+			const band = await box('.deck-controls')
+			const frames = await Promise.all(
+				['current', 'prev', 'next'].map((name) => box(`.slide[data-slide="${name}"] > ._frame`)),
+			)
+			// 操作の部分は画面の下の端から 1rem、ノートはその 1rem 上で終わる
+			expect(band.y + band.height).toBeCloseTo(viewport.height - rem, 0)
+			expect(notes.y + notes.height).toBeCloseTo(band.y - rem, 0)
+			for (const frame of frames) {
+				// 枠は 16:9 のまま、ノートの下端より上に収まり、ノートの左に 1rem 以上離れる
+				expect(frame.width / frame.height).toBeCloseTo(16 / 9, 1)
+				expect(frame.y + frame.height).toBeLessThanOrEqual(notes.y + notes.height + 1)
+				expect(frame.x + frame.width).toBeLessThanOrEqual(notes.x - rem + 1)
+			}
+			const [current, prev, next] = frames
+			if (!current || !prev || !next) throw new Error('枠が 3 つ取れない')
+			// 前と次は今のスライドの下に、間を 1rem 以上空けて並ぶ
+			expect(prev.y).toBeGreaterThanOrEqual(current.y + current.height + rem - 1)
+			expect(next.x).toBeGreaterThanOrEqual(prev.x + prev.width + rem - 1)
+		})
+	}
+
+	test('操作の部分は画面の左下に中身の幅で置き、ツールチップをボタンの上に出す', async ({ page }) => {
+		const viewport = { width: 1440, height: 900 }
+		await page.setViewportSize(viewport)
+		await page.goto(`${DECK_PATH}?presenter#2`)
+		await expect(deck(page)).toHaveAttribute('data-view', 'presenter')
+		const rem = await page.evaluate(() => Number.parseFloat(getComputedStyle(document.documentElement).fontSize))
+		const band = await controls(page).boundingBox()
+		if (!band) throw new Error('操作の部分の位置が取れない')
+		expect(band.x).toBeCloseTo(rem, 0)
+		expect(band.y + band.height).toBeCloseTo(viewport.height - rem, 0)
+		expect(band.width).toBeLessThan(viewport.width / 2)
+		const button = controlButton(page, '次へ')
+		const buttonBox = await button.boundingBox()
+		const tooltipBox = await button.locator('._tooltip').boundingBox()
+		if (!buttonBox || !tooltipBox) throw new Error('ボタンとツールチップの位置が取れない')
+		// 位置はボタンの枠線の内側から測るので、ボタンの枠線（1px）の分だけずれてよい
+		expect(Math.abs(tooltipBox.y + tooltipBox.height - (buttonBox.y - 0.375 * rem))).toBeLessThanOrEqual(1.5)
+		// ツールチップを上に出すので、画面が縦にスクロールしない
+		expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(viewport.height)
+	})
+
 	test('縦長の画面でも発表者ビューになる', async ({ page }) => {
 		await page.setViewportSize(PORTRAIT)
 		await page.goto(`${DECK_PATH}?presenter`)
 		await expect(deck(page)).toHaveAttribute('data-view', 'presenter')
 	})
 
-	test('経過時間を分と秒で出し、ボタンで 0 に戻す', async ({ page }) => {
+	test('開いたときは止まっていて、再生で数え、一時停止は値を残し、停止で 0 に戻す', async ({ page }) => {
 		// Date.now() を固定し、時間はテストが進めた分だけ経つようにする。
 		// install() のままでは時計が実時間でも進み、遅いブラウザ（Firefox）で 1 秒ずれて失敗することがあったため。
 		// 1 秒ごとの描き直しは本物のタイマーで動くので、固定した時刻を進めたあとの表示を待てる
@@ -494,27 +629,77 @@ test.describe('発表者ビュー', () => {
 		await page.goto(`${DECK_PATH}?presenter`)
 		const timer = page.locator('.presenter-timer')
 		const elapsed = timer.getByRole('timer').locator('time')
+		const play = timerButton(page, '再生')
+		const pause = timerButton(page, '一時停止')
+		const stop = timerButton(page, '停止')
+		const expectDisabled = async (expected: { play: boolean; pause: boolean; stop: boolean }) => {
+			await expect(play).toHaveAttribute('aria-disabled', String(expected.play))
+			await expect(pause).toHaveAttribute('aria-disabled', String(expected.pause))
+			await expect(stop).toHaveAttribute('aria-disabled', String(expected.stop))
+		}
+
 		await expect(timer).toBeVisible()
 		await expect(elapsed).toHaveText('0 分 0 秒')
 		await expectTimerDigits(page, [0, 0, 0, 0])
+		await expectDisabled({ play: false, pause: true, stop: true })
+		// 再生する前の時間は数えない（下の 1 分 5 秒は、再生を押した時刻から数えた値）
+		await page.clock.setFixedTime(TIMER_START + 10_000)
+		// aria-disabled のボタンを押しても何もしない。
+		// Playwright の click() は aria-disabled のボタンを押せるようになるまで待つので、click のイベントを直接送る
+		await stop.dispatchEvent('click')
+		await pause.dispatchEvent('click')
+		await expectDisabled({ play: false, pause: true, stop: true })
 
-		await page.clock.setFixedTime(TIMER_START + 65_000)
+		await play.click()
+		await expectDisabled({ play: true, pause: false, stop: false })
+		await page.clock.setFixedTime(TIMER_START + 10_000 + 65_000)
 		await expect(elapsed).toHaveText('1 分 5 秒')
 		await expect(elapsed).toHaveAttribute('datetime', 'PT1M5S')
 		await expectTimerDigits(page, [0, 1, 0, 5])
 
-		const reset = timer.getByRole('button', { name: '時間を 0に戻す', exact: true })
-		// 見えるラベルが名前に含まれる（WCAG 2.5.3）。
-		// 見えない「時間を」は position: fixed で block になるので、名前の計算で後ろに空白が入る
-		await expect(reset).toContainText('0に戻す')
-		await reset.click()
+		await pause.click()
+		await expectDisabled({ play: false, pause: true, stop: false })
+		// 一時停止の間は数えず、再生すると続きから数える
+		await page.clock.setFixedTime(TIMER_START + 200_000)
+		await play.click()
+		await page.clock.setFixedTime(TIMER_START + 210_000)
+		await expect(elapsed).toHaveText('1 分 15 秒')
+		await expectTimerDigits(page, [0, 1, 1, 5])
+
+		await stop.click()
 		await expect(elapsed).toHaveText('0 分 0 秒')
 		await expectTimerDigits(page, [0, 0, 0, 0])
+		await expectDisabled({ play: false, pause: true, stop: true })
+		// 停止の後に再生すると、0 から数える
+		await page.clock.setFixedTime(TIMER_START + 300_000)
+		await play.click()
+		await page.clock.setFixedTime(TIMER_START + 305_000)
+		await expect(elapsed).toHaveText('0 分 5 秒')
+	})
+
+	test('タイマーのボタンの名前は見えない文字で、名前は読み上げないツールチップで見せ、キーは割り当てない', async ({
+		page,
+	}) => {
+		await page.goto(`${DECK_PATH}?presenter`)
+		await Promise.all(
+			['再生', '一時停止', '停止'].map(async (name) => {
+				const button = timerButton(page, name)
+				await expect(button).toHaveCount(1)
+				await expect(button).not.toHaveAttribute('aria-keyshortcuts')
+				await expect(button).not.toHaveAttribute('title')
+				const tooltip = button.locator('._tooltip')
+				await expect(tooltip).toHaveAttribute('aria-hidden', 'true')
+				await expect(tooltip).toHaveText(name)
+				await expect(tooltip.locator('kbd')).toHaveCount(0)
+				await expect(button.locator('svg')).toHaveAttribute('aria-hidden', 'true')
+			}),
+		)
 	})
 
 	test('99 分を超えると、見える数字は 99:59 で止め、読み上げは実際の時間を伝える', async ({ page }) => {
 		await page.clock.setFixedTime(TIMER_START)
 		await page.goto(`${DECK_PATH}?presenter`)
+		await timerButton(page, '再生').click()
 		await page.clock.setFixedTime(TIMER_START + (100 * 60 + 5) * 1000)
 		const elapsed = page.getByRole('timer').locator('time')
 		await expect(elapsed).toHaveText('100 分 5 秒')

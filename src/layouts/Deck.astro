@@ -92,16 +92,18 @@ const { title } = Astro.props
 				--_frame-inline-size: min(100%, var(--_stage-block-size) * var(--_ratio));
 				--_frame-block-size: min(var(--_stage-block-size), 100svi / (var(--_ratio)));
 
+				/* 枠の上の辺と右の辺から離す距離（DESIGN.md の「操作の部分」） */
+				--_inset: 1rem;
+
 				position: fixed;
 
 				/*
-				 * 枠は、枠を収める高さの中で上下の中央にあるので、上の辺は (収める高さ - 枠の高さ) / 2。
-				 * 左右も画面の中央にあるので、右の辺は (画面の幅 - 枠の幅) / 2
+				 * 枠の右上の角の内側に置く。右下にはスライドのページ番号があり、重なるため。
+				 * 画面に固定した要素からは枠の位置を参照できないので、枠が収める高さの中で上下の中央に、
+				 * 画面の左右の中央にあることから、上の辺と右の辺の位置を枠の大きさで求める
 				 */
-
-				/* 枠の右上の角に置く。右下にはスライドのページ番号があり、重なるため */
-				inset-block-start: calc((var(--_stage-block-size) - var(--_frame-block-size)) / 2);
-				inset-inline-end: calc((100% - var(--_frame-inline-size)) / 2);
+				inset-block-start: calc((var(--_stage-block-size) - var(--_frame-block-size)) / 2 + var(--_inset));
+				inset-inline-end: calc((100% - var(--_frame-inline-size)) / 2 + var(--_inset));
 			}
 
 			&:has(> .deck[data-view='present'][data-notes='shown']) > :global(.deck-controls) {
@@ -109,25 +111,40 @@ const { title } = Astro.props
 			}
 
 			/*
-			 * 発表者ビューの経過時間（PresenterTimer）を、画面の上の端に、端から離して置く。
-			 * 画面の端からの余白は置き場所で決まるので、PresenterTimer のルートではなく、置く側のここに書く
-			 * （no-external-layout-on-root、parent-owns-child-placement）。発表者ビューのとき以外は hidden で出ない。
-			 * 上の余白は body の内側の余白で、デッキとの間は次兄弟のデッキの margin で作り、どちらも 1rem にする
-			 * （margin-collapse-padding-for-inner-space、block-margin-with-sibling-combinator）
-			 */
-			& > :global(.presenter-timer) {
-				margin-inline: 1rem;
-			}
-
-			/*
-			 * hidden の経過時間も兄弟に数えるので、デッキの上の margin と body の上の余白は、
-			 * 経過時間を出す発表者ビューのときだけにする
+			 * 発表者ビューでは、経過時間、デッキ、操作の部分を、この順に画面の高さ（100svb）に収める。
+			 * デッキの行を残りの高さにし、ノートの領域を操作の部分のすぐ上まで届かせる（DESIGN.md の「発表者ビュー」）。
+			 * 行の最小を 0 にし、長いノートでデッキが画面の高さを超えないようにする（ノートは領域の中でスクロールする）。
+			 * hidden の要素はグリッドのアイテムにならないので、間は row-gap で空ける（gap-over-child-margin）。
+			 * kiso.css の body の min-block-size（100dvb）は残す。dvb は svb 以上なので、画面に収まる高さは変わらない
 			 */
 			&:has(> .deck[data-view='presenter']) {
-				padding-block-start: 1rem;
+				display: block grid;
+				grid-template-rows: auto minmax(0, 1fr) auto;
+				row-gap: 1rem;
+				block-size: 100svb;
 
-				& > :global(.presenter-timer) + .deck {
-					margin-block-start: 1rem;
+				/*
+				 * 経過時間、デッキ、操作の部分を、画面の端から 1rem 離す。端からの余白は置き場所で決まるので、
+				 * 子のルートではなく、置く側の body の内側の余白で取る
+				 * （no-external-layout-on-root、parent-owns-child-placement、margin-collapse-padding-for-inner-space）
+				 */
+				padding: 1rem;
+
+				/* 操作の部分は、画面の下の端の左に置き、帯の幅を中身の幅のままにする（DESIGN.md の「発表者ビュー」） */
+				& > :global(.deck-controls) {
+					--deck-controls--tooltip-side: --block-start;
+
+					justify-self: start;
+				}
+
+				/*
+				 * 経過時間のツールチップは、下のデッキに重なる。デッキは HTML の順で後ろにあり、
+				 * 大きさのコンテナとして重なりの区切りを作るので、木の順のままではツールチップが隠れる。
+				 * 経過時間はグリッドのアイテムなので、position を足さずに z-index で前に出す
+				 * （z-index-absolute-root-relative-inside、z-index-on-items-without-position）
+				 */
+				& > :global(.presenter-timer) {
+					z-index: var(--z--timer);
 				}
 			}
 		}
@@ -158,25 +175,52 @@ const { title } = Astro.props
 			}
 
 			/*
-			 * 発表者ビュー。左に今のスライドの枠を大きく、右の上に次のスライドを小さく、右の下にノートを置く。
+			 * 発表者ビュー。左の上に今のスライドの枠を大きく、左の下に前と次のスライドを小さく横に並べ、
+			 * 右に今のスライドのノートを上から下まで置く（DESIGN.md の「発表者ビュー」）。
 			 * 今のスライドは全体（--stage）に広げ、その中の枠とノートを subgrid で --frame と --notes に置く（Slide.astro）。
-			 * 枠の幅は列の幅で決まり、2fr と 1fr で、今のスライドを次のスライドの 2 倍の幅にする。
-			 * 経過時間（PresenterTimer）と操作の部分は、HTML の順のまま、デッキの上と下に置く
+			 * 最初のスライドには前が、最後のスライドには次がなく、その場所は空く。
+			 *
+			 * 前と次を今のスライドの下に半分ずつ並べるため、左を 2 列に分ける。左と右（ノート）は画面の幅を半分ずつ使う（DESIGN.md）。
+			 * 上の段を下の段の 2 倍の高さにするのは、前と次が今のスライドの半分の幅で、枠の高さも半分になるため。
+			 * デッキの高さは body のグリッドで決まり（経過時間と操作の部分の残り）、ノートはその高さいっぱいに広がる。
+			 * 枠やノートの中身で行と列が広がって、body の行を超えないよう、最小を 0 にする。
+			 *
+			 * 枠の幅は列の幅で決まるが、画面が横に長いと、枠の高さが行の高さを超える。
+			 * そこで、デッキを大きさのコンテナにし、各スライドに、枠を収める高さとして行の高さを cqb で渡す。
+			 * 式の 2 / 3 と 1 / 3 は、上の行の 2fr と 1fr にそろえる。cqb は渡した先の枠で、このデッキの高さに対して解決される
 			 */
 			&[data-view='presenter'] {
+				--_gap: 1rem;
+
+				/* stylelint-disable-next-line declaration-property-value-disallowed-list -- 高さは body のグリッドの行で確定しているため（no-container-type-size の例外。上のコメント） */
+				container: --deck / size;
 				display: block grid;
 				reading-flow: grid-rows;
 				grid-template:
-					[--stage-start] '--frame --next' auto
-					'--frame --notes' 1fr [--stage-end]
-					/ [--stage-start] 2fr 1fr [--stage-end];
+					[--stage-start] '--frame --frame --notes' minmax(0, 2fr)
+					'--prev --next --notes' minmax(0, 1fr) [--stage-end]
+					/ [--stage-start] minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2fr) [--stage-end];
+				gap: var(--_gap);
 			}
 
 			&[data-view='presenter'] > :global(.slide[data-slide='current']) {
+				/* stylelint-disable-next-line unit-disallowed-list -- デッキの高さが確定している大きさのコンテナなので、cqb が働く */
+				--slide--stage-block-size: calc((100cqb - var(--_gap)) * 2 / 3);
+
 				grid-area: --stage;
 			}
 
+			&[data-view='presenter'] > :global(.slide[data-slide='prev']) {
+				/* stylelint-disable-next-line unit-disallowed-list -- デッキの高さが確定している大きさのコンテナなので、cqb が働く */
+				--slide--stage-block-size: calc((100cqb - var(--_gap)) / 3);
+
+				grid-area: --prev;
+			}
+
 			&[data-view='presenter'] > :global(.slide[data-slide='next']) {
+				/* stylelint-disable-next-line unit-disallowed-list -- デッキの高さが確定している大きさのコンテナなので、cqb が働く */
+				--slide--stage-block-size: calc((100cqb - var(--_gap)) / 3);
+
 				grid-area: --next;
 			}
 		}
