@@ -2,7 +2,7 @@
 name: deck-reviewer
 description: スライドの原稿（deck.mdx）を、書いた側の会話を持たずに、元の記事と規則に照らして判定するレビュー係。create-slide のスキルの手順で、ビルドと検査の後に呼ぶ。判定のファイルのほかは書かない。
 model: fable
-effort: medium
+effort: high
 # 判定のファイルを日本語で書くので、グローバルの hook（require-japanese-skills.py）が求める文章のスキルを読み込む
 skills:
   - japanese-tech-writing

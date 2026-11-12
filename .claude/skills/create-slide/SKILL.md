@@ -15,7 +15,7 @@ disable-model-invocation: true
 | --- | --- | --- | --- |
 | 読む係 | `article-reader` | sonnet | `material.md`（記事の素材） |
 | 書く係 | `deck-writer` | opus・medium | `deck.mdx`（原稿） |
-| レビュー係 | `deck-reviewer` | fable・medium | `review.md`（判定） |
+| レビュー係 | `deck-reviewer` | fable・high | `review.md`（判定） |
 
 ファイルはすべて `slides/<slug>/` に置く。slug は、URL の最後の部分か、ファイルの名前から作る。
 

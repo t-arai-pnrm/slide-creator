@@ -23,7 +23,7 @@ paths:
 - Fable を使うのは、レビュー係（PR の 1 周に 1 回）、スライドの原稿のレビュー係（`deck-reviewer`、下の例外）、ユーザーが難しいタスクで有効にした助言役だけにする。サブスクリプションでは、Fable は週の利用枠を Opus より速く使い、使えるのも枠の一部に限られる
 - 助言役は `.claude/settings.json` の `advisorModel` に書かない。書くと、すべてのセッションとサブエージェント（並列に動かす読む係を含む）が Fable の助言役を持ち、呼ぶたびに会話の全文を読ませる
 
-- 例外として、スライドの原稿を作る係（create-slide のスキル）は、読む係（`article-reader`）を sonnet にしている。記事の全文を読んで素材を正しく写すのが仕事で、haiku では抜けと主張の取り違えが出やすいため。書く係（`deck-writer`）は opus・medium、レビュー係（`deck-reviewer`）は fable・medium で、デッキを 1 つ作るたびに 1 周以上呼ぶ
+- 例外として、スライドの原稿を作る係（create-slide のスキル）は、読む係（`article-reader`）を sonnet にしている。記事の全文を読んで素材を正しく写すのが仕事で、haiku では抜けと主張の取り違えが出やすいため。書く係（`deck-writer`）は opus・medium、レビュー係（`deck-reviewer`）は fable・high で、デッキを 1 つ作るたびに 1 周以上呼ぶ
 
 ## スライドの原稿を作る流れ
 
