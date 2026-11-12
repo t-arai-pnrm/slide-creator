@@ -1,6 +1,6 @@
 /**
  * 見た目の順番が DOM の順番から離れうる配置を書いたルールに、`reading-flow` を求めるルール。
- * 出典: RECSSガイドラインのリポジトリの stylelint/reading-flow-when-reordered.mjs（v0.83.2）
+ * 出典: RECSSガイドラインのリポジトリの stylelint/reading-flow-when-reordered.mjs（v0.84.0）
  *
  * 次の宣言は、子の並ぶ順番を DOM の順番と違うものにできる。読み上げとキーボードの
  * フォーカスは DOM の順番で進むので、同じルールに `reading-flow` を書き、読み上げの順番を

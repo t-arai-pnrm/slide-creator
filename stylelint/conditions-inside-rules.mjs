@@ -1,6 +1,6 @@
 /**
  * `@media` と `@container` を、セレクタ（スタイルルール）の中に書くことを求めるルール。
- * 出典: RECSSガイドラインのリポジトリの stylelint/conditions-inside-rules.mjs（v0.83.2）
+ * 出典: RECSSガイドラインのリポジトリの stylelint/conditions-inside-rules.mjs（v0.84.0）
  *
  * `@scope` や `@layer` の直下に条件付きのアットルールを置くと、`order/order` の並び順
  * （アットルールをルールより前に置く）によって、上書きのための条件が元のルールより前に並ぶ。
