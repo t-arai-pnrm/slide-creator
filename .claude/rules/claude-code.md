@@ -23,6 +23,14 @@ paths:
 - Fable を使うのは、レビュー係（PR の 1 周に 1 回）と、ユーザーが難しいタスクで有効にした助言役だけにする。サブスクリプションでは、Fable は週の利用枠を Opus より速く使い、使えるのも枠の一部に限られる
 - 助言役は `.claude/settings.json` の `advisorModel` に書かない。書くと、すべてのセッションとサブエージェント（並列に動かす読む係を含む）が Fable の助言役を持ち、呼ぶたびに会話の全文を読ませる
 
+- 例外として、スライドの原稿を作る係（create-slide のスキル）は、読む係（`article-reader`）を sonnet にしている。記事の全文を読んで素材を正しく写すのが仕事で、haiku では抜けと主張の取り違えが出やすいため。書く係（`deck-writer`）は opus・medium、レビュー係（`deck-reviewer`）は fable・medium で、デッキを 1 つ作るたびに 1 周以上呼ぶ
+
+## スライドの原稿を作る流れ
+
+- `/create-slide` は、取り込み（`scripts/ingest.ts`）、通読（`article-reader`）、構成案、執筆（`deck-writer`）、ビルドと検査、レビュー（`deck-reviewer`）の順に進む。構成案でユーザーの承認を待つのは、何を話すかの重み付けを人が決めるため（`--yes` のときだけ止まらない）
+- 作るファイルは `slides/<slug>/` の `source.md`（取り込んだ記事）、`material.md`（素材）、`outline.md`（構成案）、`deck.mdx`（原稿）、`review.md`（判定）と画像
+- 原稿の書き方（MDX）とレイアウトの指定の方法、デッキの検査（`pnpm check:decks`）は、テーマの作業で決めている最中。決まったら、スキルの「原稿の形」と `deck-writer`、`deck-reviewer` の定義を直す
+
 ## スキルの置き場所
 
 - 文章のスキル（japanese-tech-writing、cognitive-rhythm-writing、yomiyasu）は、このリポジトリに置かない。実体は taklog の `.claude/skills/` にあり、この Mac の `~/.claude/skills/` の同じ名前のものが、そこへのシンボリックリンクになっている。規則を直すときは taklog の側を直す
