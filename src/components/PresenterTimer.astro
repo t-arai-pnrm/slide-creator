@@ -2,28 +2,65 @@
 /**
  * 発表者ビューの経過時間と、時間を 0 に戻すボタン。src/scripts/deck.ts が、発表者ビューのときだけ hidden を外して動かす。
  * 経過時間は 1 秒ごとに変わるので、ライブリージョンにしない。読み上げが発表の間ずっと続くため。
+ * 役割は timer にする。timer は既定で aria-live="off" なので、値が変わっても読み上げず、読みに来たときに今の値が分かる。
+ *
+ * 見える数字は桁ごとの帯（0 から 9 を縦に並べたもの）で、スクリプトが桁の値を --_value に書き、CSS が帯を動かす。
+ * 帯の数字は読み上げると「0 1 2 …」と並んで意味をなさないので、aria-hidden で隠し、読み上げは見えない time の文字（「1 分 5 秒」）で伝える。
+ * 「01:05」の形は時刻と区別しにくいので、読み上げの文字は分と秒を言葉で書く。
+ *
+ * 0 に戻すボタンの見えるラベルは「0に戻す」で、何を戻すかは見えない文字の「時間を」で補う。
+ * 名前の「時間を 0に戻す」が見えるラベルを含むので、音声入力で見えるラベルを言っても押せる（WCAG 2.5.3）。
+ * 名前の「時間を」の後ろの空白は、見えない文字が position: fixed で block になるため、名前の計算で入る。
+ * 数字と和文の間は text-autospace が空けるので、ラベルに空白を書かない。書くと間が広く開いて見える。
  *
  * 文字は枠に比例させず、rem の control のスタイルで書く。面と線は、操作の部分（DeckControls）と同じ役割の色にする。
  * 置き場所（画面の上の端）は、置く側の Deck.astro が HTML の順で決める。
  */
+import Icon from '@/components/Icon.astro'
+
+/**
+ * 表示する桁。分 2 桁と秒 2 桁で、スクリプトはこの順で桁を書く。
+ * 99 分を超えたときの扱いは、src/scripts/deck.ts の桁を書くところにある
+ */
+const DIGIT_GROUPS = [2, 2] as const
+const REEL = Array.from({ length: 10 }, (_, value) => value)
 ---
 
 <div class="presenter-timer" hidden>
-	<p class="_elapsed">
-		<span class="-visually-hidden">経過時間</span>
-		<time datetime="PT0M0S">00:00</time>
-	</p>
-	<button type="button" class="_reset" data-action="reset-timer">時間を 0 に戻す</button>
+	<div class="_card" role="timer">
+		<p class="_label">経過時間</p>
+		<p class="_elapsed">
+			<time class="-visually-hidden" datetime="PT0M0S">0 分 0 秒</time>
+			<span class="_digits" aria-hidden="true">
+				{DIGIT_GROUPS.map((digits, groupIndex) => (
+					<>
+						{groupIndex > 0 && <span class="_separator">:</span>}
+						{Array.from({ length: digits }, () => <span class="_digit" style="--_value: 0" data-timer-digit>
+							<span class="_reel">
+								{REEL.map((value) => <span class="_reel-number">{value}</span>)}
+							</span>
+						</span>)}
+					</>
+				))}
+			</span>
+		</p>
+	</div>
+	<button type="button" class="_reset" data-action="reset-timer">
+		<Icon name="rotate-ccw" /><span class="_reset-label"><span class="-visually-hidden">時間を</span>0に戻す</span>
+	</button>
 </div>
 
 <style>
 	@layer components {
+		/*
+		 * 経過時間のカードと、0 に戻すボタンを横に並べ、下端をそろえる。
+		 * 1 行に入らないときは、ボタンをカードの下へ折り返す（DESIGN.md の「タイマー」）
+		 */
 		.presenter-timer {
 			display: block flex;
 			flex-wrap: wrap;
-			align-items: center;
-			border: 1px solid var(--border--base);
-			background-color: var(--background--surface);
+			gap: 0.75rem;
+			align-items: end;
 			font-family: var(--text--control--font-family);
 			font-size: var(--text--control--font-size);
 			font-weight: var(--text--control--font-weight);
@@ -35,25 +72,103 @@
 			}
 		}
 
+		/*
+		 * ラベルの上に数字を積む。ラベルの文字は ._label 自身が text-box で刈るので、グリッドにしても刈り方は変わらない
+		 * （gap-over-child-margin）
+		 */
+		._card {
+			display: block grid;
+			row-gap: 0.5rem;
+			padding-block: 0.75rem;
+			padding-inline: 1rem;
+			border: 1px solid var(--border--base);
+			border-radius: var(--rounded--control);
+			background-color: var(--background--surface);
+		}
+
+		/* 大文字と字間の扱いは、スライドの中の label にそろえる（DESIGN.md の「タイマー」） */
+		._label {
+			color: var(--foreground--muted);
+			text-box: trim-both;
+			letter-spacing: var(--text--label--tracking);
+			text-transform: uppercase;
+		}
+
 		._elapsed {
-			/* 等幅の書体を読み込めず、和文の書体の数字で出たときにも、1 秒ごとに幅が揺れないようにする */
+			font-family: var(--text--timer--font-family);
+			font-size: var(--text--timer--font-size);
+			font-weight: var(--text--timer--font-weight);
+
+			/*
+			 * 1 秒ごとに数字が替わっても、桁の窓の幅が揺れないようにする（tabular-nums-for-changing-numbers）。
+			 * 等幅の書体を読み込めず、和文の書体の数字で出たときも同じ
+			 */
 			font-variant-numeric: tabular-nums;
+			line-height: var(--text--timer--leading);
+			letter-spacing: var(--text--timer--tracking);
+		}
+
+		/* マークアップの改行が空白の文字として入るので、グリッドで並べて空白を詰める */
+		._digits {
+			display: block grid;
+			grid-auto-flow: column;
+			justify-content: start;
+		}
+
+		._separator {
+			color: var(--foreground--muted);
+		}
+
+		/* 1 字分の窓。帯の数字は 1 行に 1 字ずつ並ぶので、1 行の高さ（1lh）の窓に 1 字が入る。上下の端で隣の数字を切る */
+		._digit {
+			display: block flow;
+			overflow: clip;
+			block-size: 1lh;
 		}
 
 		/*
-		 * 見た目は操作の部分のボタン（DeckControls の ._button）と同じにする。
-		 * 押した状態と無効の状態は持たない
+		 * 0 から 9 を縦に並べた帯。スクリプトが窓（._digit）に書いた桁の値（--_value）の分だけ上へ動かし、その数字を窓に出す。
+		 * 位置が変わる動きなので、動きを減らす設定では動かさず、一度に替える（motion-only-with-no-preference）
 		 */
+		._reel {
+			display: block grid;
+			translate: 0 calc(var(--_value) * -1lh);
+
+			@media (prefers-reduced-motion: no-preference) {
+				transition-duration: var(--duration--slow);
+				transition-property: translate;
+				transition-timing-function: var(--ease--out-quint);
+			}
+		}
+
+		/* 押した状態と無効の状態は持たない */
 		._reset {
 			/* 押せる部分の大きさ。文字と一緒に大きくし、CSS ピクセルの下限も併せて書く（hit-area-min-size） */
 			--_hit-size: max(24px, 24 / 16 * 1rem);
-			--_background--hocus: var(--background--base);
+			--_background--hocus: var(--background--surface);
 
+			/* アイコンの大きさは、Icon の公開プロパティで渡す */
+			--icon--size: 1rem;
+
+			/* 強制カラーモードでは、アイコンの線をボタンの文字のシステムカラーにする（forced-colors-svg-system-colors） */
+			--icon--forced-color: ButtonText;
+
+			/*
+			 * アイコンとラベルは、折り返すと 1 つのボタンの中身に見えなくなるので、1 行に並べたまま折り返さない
+			 * （flex-wrap-for-variable-items の例外）
+			 */
+			display: block flex;
+			column-gap: 0.375rem;
+			align-items: center;
 			min-inline-size: var(--_hit-size);
-			min-block-size: var(--_hit-size);
 
-			/* 面のほかに線を足さない。強制カラーモードでは線が見えるよう、none ではなく透明にする */
-			border-color: transparent;
+			/* 高さは DESIGN.md の 2.25rem を下限にし、文字が大きくなったら伸ばす（min-block-size-over-fixed-height） */
+			min-block-size: max(2.25rem, var(--_hit-size));
+			padding-inline: 0.875rem;
+			border-color: var(--border--base);
+			border-radius: 0.5rem;
+			background-color: var(--background--base);
+			color: var(--foreground--base);
 
 			@media (any-pointer: coarse) {
 				--_hit-size: max(44px, 44 / 16 * 1rem);
@@ -73,11 +188,29 @@
 				transition-duration: var(--duration--fast);
 				transition-property: background-color;
 				transition-timing-function: var(--ease--hover);
+
+				/* 押している間の縮みは、動きを減らす設定がないときだけにする（motion-only-with-no-preference） */
+				@media (prefers-reduced-motion: no-preference) {
+					transition-property: background-color, scale;
+					transition-timing-function: var(--ease--hover), var(--ease--out-quint);
+				}
 			}
 
 			&:focus-visible {
 				background-color: var(--_background--hocus);
 			}
+
+			/* 押している間は縮め、押したことを返す（press-feedback-short） */
+			&:enabled:active {
+				@media (prefers-reduced-motion: no-preference) {
+					scale: 0.97;
+				}
+			}
+		}
+
+		/* 枠の中に置いた文字なので、ハーフレディングを刈る */
+		._reset-label {
+			text-box: trim-both;
 		}
 	}
 </style>

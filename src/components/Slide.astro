@@ -13,8 +13,11 @@ interface Props {
 	total: number
 	/** 章のラベル。枠線の左上の角に、題名の上に置く */
 	chapter?: string | undefined
-	/** レイアウト。cover は表紙、section は章の扉、statement は主張（題名をキーメッセージとして大きく出す） */
-	layout?: 'cover' | 'section' | 'statement' | undefined
+	/**
+	 * レイアウト。cover は表紙、section は章の扉、statement は主張（題名をキーメッセージとして大きく出す）、
+	 * quote は引用、number は数値、end は最後。図解、コード、比較、画像、出典は指定せず、本文に置く部品で決まる
+	 */
+	layout?: 'cover' | 'section' | 'statement' | 'quote' | 'number' | 'end' | undefined
 }
 
 const { page, total, chapter, layout } = Astro.props
@@ -57,6 +60,9 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 
 			/* 枠を収める高さ。ふだんは画面の高さで、ノートの領域を取ったときはその残り */
 			--_stage-block-size: 100svb;
+
+			/* スライドが替わったときに要素を順に出す間隔（DESIGN.md の「動かしてよい場面」） */
+			--_stagger: var(--duration--stagger);
 
 			/*
 			 * 上の残りの高さに枠を、下にノートの領域を置く。枠は上の領域の中で上下の中央に置く。
@@ -138,6 +144,13 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			inline-size: stretch;
 
 			/*
+			 * aspect-ratio を持つ箱は、中身が高さを超えると、自動の最小の大きさ（min-block-size: auto）で縦に伸びる。
+			 * 枠は中身にかかわらず 16:9 に保つので、最小の大きさを 0 にする。
+			 * 収まらない中身は枠を伸ばさず、本文の領域からあふれさせる（下の ._body）
+			 */
+			min-block-size: 0;
+
+			/*
 			 * 画面の幅は、幅が auto のブロックが親の幅を超えないことで受け持つ。
 			 * ここでは画面の高さから決まる上限だけを書く（viewport-units-as-last-resort）
 			 */
@@ -148,6 +161,14 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			/* 発表者ビューの次のスライドは、隣の今のスライドと面の色が同じなので、線で区切る */
 			&:is(.slide[data-slide='next'] > *) {
 				border: 1px solid var(--border--base);
+			}
+
+			& > ._frame-inner {
+				/*
+				 * 枠のグリッドの行は、この要素の中身の高さを最小の大きさとして伸び、枠の下へはみ出す。
+				 * 枠の高さに収め、ページ番号を枠線の右下の角に保つ（収まらない中身は ._body からあふれる）
+				 */
+				min-block-size: 0;
 			}
 		}
 
@@ -167,12 +188,41 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			padding-block: var(--guide--block);
 			padding-inline: var(--guide--inline);
 
+			/* 表紙、章の扉、最後は、題名を枠の下寄りに置き、上を空ける */
+			&:is(.slide:is([data-layout='cover'], [data-layout='section'], [data-layout='end']) *) {
+				reading-flow: grid-rows;
+				grid-template:
+					'.' 1fr
+					'--heading' auto
+					'--body' auto
+					'--page' auto
+					/ 1fr;
+			}
+
+			/* 主張は、キーメッセージを枠の中ほどに置き、補足を下に小さく添える */
+			&:is(.slide[data-layout='statement'] *) {
+				reading-flow: grid-rows;
+				grid-template:
+					'.' 1fr
+					'--heading' auto
+					'--body' auto
+					'.' 1fr
+					'--page' auto
+					/ 1fr;
+			}
+
 			& > ._heading {
 				grid-area: --heading;
 			}
 
 			& > ._body {
 				grid-area: --body;
+
+				/*
+				 * 本文の行（1fr）は、中身の高さを最小の大きさとして伸び、ページ番号を枠線の外へ押し出す。
+				 * 本文の領域を残りの高さに収め、収まらない中身はこの中からあふれさせて、ページ番号の位置を保つ
+				 */
+				min-block-size: 0;
 			}
 
 			& > ._page {
@@ -182,13 +232,78 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 		}
 
 		._heading {
+			/*
+			 * 発表の表示でスライドが替わったら、題名、題名の下の線、本文の要素の順に出す（DESIGN.md の「動かしてよい場面」）。
+			 * 隠したスライドは display: none なので、表示に戻るたびにアニメーションが最初から再生される。
+			 * そのため、スクリプトで始め直す処理は要らない。
+			 * 縦に並べて読む形と、発表者ビューの次のスライドは動かさない。
+			 * 移動は動きを減らす設定では外し、不透明度の変化だけを残す（motion-only-with-no-preference）
+			 */
+			&:is(:global(.deck[data-view='present']) > .slide[data-slide='current'] *) {
+				--translate-from--y-value: var(--distance--enter);
+
+				animation-name: --fade-in;
+				animation-duration: var(--duration--slow);
+				animation-timing-function: var(--ease--out-quint);
+				animation-fill-mode: both;
+
+				@media (prefers-reduced-motion: no-preference) {
+					animation-name: --fade-in, --translate-from;
+				}
+			}
+
+			/* 表紙と最後は、題名の上にアクセントの太い線を引く。アクセントはこの 1 か所だけにする */
+			&:is(.slide:is([data-layout='cover'], [data-layout='end']) *) {
+				max-inline-size: 75cqi;
+				padding-block-start: var(--spacing--md);
+				border-block-start: var(--line-width--thick) solid var(--accent--base);
+			}
+
+			/*
+			 * ふつうのスライドは、題名の下に細い線を引いて、本文と分ける。
+			 * 切り替えのときに左から伸ばす（下のアニメーション）ため、枠線ではなく疑似要素で描く。
+			 * 強制カラーモードでも見えるよう、面ではなく線で描く
+			 */
+			&:is(
+					.slide:is(:not([data-layout]), [data-layout='quote'], [data-layout='number'], [data-layout='section']) *
+				)::after {
+				content: '';
+				display: block flow;
+				margin-block-start: var(--spacing--sm);
+				border-block-start: var(--line-width--thin) solid var(--border--strong);
+			}
+
+			/* 章の扉は、題名の下に太い線を引く。上の指定より後に書いて勝たせる */
+			&:is(.slide[data-layout='section'] *)::after {
+				border-block-start-width: var(--line-width--thick);
+			}
+
+			/*
+			 * 題名の下の線は、題名の後に左から伸ばす。伸びる動きなので、動きを減らす設定では動かさない
+			 * （motion-only-with-no-preference）。transform-origin には論理方向の値がないので、
+			 * 物理方向の left で書く（physical-only-where-no-logical）
+			 */
+			&:is(:global(.deck[data-view='present']) > .slide[data-slide='current'] *)::after {
+				@media (prefers-reduced-motion: no-preference) {
+					--scale-from--x-value: 0;
+
+					transform-origin: left;
+					animation-name: --scale-from;
+					animation-duration: var(--duration--slow);
+					animation-timing-function: var(--ease--out-quint);
+					animation-delay: var(--_stagger);
+					animation-fill-mode: both;
+				}
+			}
+
 			& > ._chapter + ._title {
 				margin-block-start: var(--spacing--xs);
 			}
 		}
 
+		/* 章のラベルの文字は、taklog の記事の分類のラベルに合わせてアクセントの色にする（DESIGN.md の「アクセントの使い方」） */
 		._chapter {
-			color: var(--foreground--muted);
+			color: var(--accent--base);
 			font-family: var(--text--label--font-family);
 			font-size: var(--text--label--font-size);
 			font-weight: var(--text--label--font-weight);
@@ -210,67 +325,16 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			font-weight: var(--text--title--font-weight);
 			line-height: var(--text--title--leading);
 
+			/* 題名が 2 行になったとき、後ろの行に数文字だけ残らないよう、行の長さをそろえる */
+			text-wrap: balance;
+
 			/* 表紙、章の扉、主張は display のスタイルにする（DESIGN.md の「レイアウトの一覧」） */
-			&:is(.slide:is([data-layout='cover'], [data-layout='section'], [data-layout='statement']) *) {
+			&:is(
+				.slide:is([data-layout='cover'], [data-layout='section'], [data-layout='statement'], [data-layout='end']) *
+			) {
 				font-size: var(--text--display--font-size);
 				line-height: var(--text--display--leading);
 			}
-		}
-
-		/* ふつうのスライドは、題名の下に細い線を引いて、本文と分ける */
-		.slide:not([data-layout]) ._heading {
-			padding-block-end: var(--spacing--sm);
-			border-block-end: var(--line-width--thin) solid var(--border--base);
-		}
-
-		/* 表紙と章の扉は、題名を枠の下寄りに置き、上を空ける */
-		.slide:is([data-layout='cover'], [data-layout='section']) ._frame-inner {
-			reading-flow: grid-rows;
-			grid-template:
-				'.' 1fr
-				'--heading' auto
-				'--body' auto
-				'--page' auto
-				/ 1fr;
-		}
-
-		/* 表紙は、題名の上にアクセントの太い線を引く */
-		.slide[data-layout='cover'] ._heading {
-			max-inline-size: 75cqi;
-			padding-block-start: var(--spacing--md);
-			border-block-start: var(--line-width--thick) solid var(--accent--base);
-		}
-
-		/* 章の扉は、章の番号を大きな数字にする */
-		.slide[data-layout='section'] ._chapter {
-			color: var(--foreground--base);
-			font-family: var(--text--number--font-family);
-			font-size: var(--text--number--font-size);
-			font-weight: var(--text--number--font-weight);
-			line-height: var(--text--number--leading);
-			letter-spacing: var(--text--number--tracking);
-			text-transform: none;
-		}
-
-		.slide[data-layout='section'] ._heading {
-			padding-block-end: var(--spacing--sm);
-			border-block-end: var(--line-width--thick) solid var(--border--strong);
-		}
-
-		/* 主張は、キーメッセージを枠の中ほどに置き、補足を下に小さく添える */
-		.slide[data-layout='statement'] ._frame-inner {
-			reading-flow: grid-rows;
-			grid-template:
-				'.' 1fr
-				'--heading' auto
-				'--body' auto
-				'.' 1fr
-				'--page' auto
-				/ 1fr;
-		}
-
-		.slide[data-layout='statement'] ._body {
-			max-inline-size: 70cqi;
 		}
 
 		._body {
@@ -279,9 +343,40 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			font-weight: var(--text--body--font-weight);
 			line-height: var(--text--body--leading);
 
+			/* 表紙と最後の発表者の名前は、本文の下に、枠線の右下の角に寄せず左端にそろえる */
+			&:is(.slide:is([data-layout='cover'], [data-layout='end']) *) {
+				margin-block-start: var(--spacing--sm);
+			}
+
+			/* 数値は、数字を本文の領域の下寄りに大きく置く */
+			&:is(.slide[data-layout='number'] *) {
+				align-self: end;
+			}
+
+			&:is(.slide[data-layout='statement'] *) {
+				max-inline-size: 70cqi;
+			}
+
 			/* 本文は原稿のスロットから入り、クラスを付けられないので、直下の子を選ぶ */
 			& > :global(* + *) {
 				margin-block-start: var(--spacing--sm);
+			}
+		}
+
+		/* 本文の要素は、題名の 1 つ後に出す（._heading の動きと同じ条件） */
+		._body > :global(*) {
+			&:is(:global(.deck[data-view='present']) > .slide[data-slide='current'] *) {
+				--translate-from--y-value: var(--distance--enter);
+
+				animation-name: --fade-in;
+				animation-duration: var(--duration--slow);
+				animation-timing-function: var(--ease--out-quint);
+				animation-delay: var(--_stagger);
+				animation-fill-mode: both;
+
+				@media (prefers-reduced-motion: no-preference) {
+					animation-name: --fade-in, --translate-from;
+				}
 			}
 		}
 

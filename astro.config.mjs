@@ -4,6 +4,11 @@ import { defineConfig } from 'astro/config'
 export default defineConfig({
 	// Astro 7 の既定（'jsx'）は要素間の空白を消すため、HTML と同じ空白の扱いにする（taklog と同じ）
 	compressHTML: true,
+	build: {
+		// 1 つのデッキを 1 つの HTML にするため、CSS を別のファイルにせず HTML に埋め込む。
+		// 既定（'auto'）は 4KB を超える CSS を <link> で読み込み、HTML だけを持ち出すとスタイルが外れる
+		inlineStylesheets: 'always',
+	},
 	vite: {
 		build: {
 			// CSS を圧縮する Lightning CSS の対象ブラウザを .browserslistrc にそろえる。既定（baseline-widely-available）のままだと、

@@ -52,7 +52,7 @@
 	--font-weight--bold: 700;
 
 	/*
-	 * 行の高さ。tighter は大きな数字だけに使う
+	 * 行の高さ。tighter は大きな数字（数値のレイアウトと、発表者ビューの経過時間）だけに使う
 	 */
 	--leading--tighter: 1.1;
 	--leading--tight: 1.3;
@@ -66,6 +66,7 @@
 	 * 詰めるのは大きな欧文の数字、広げるのは大文字のラベルだけ
 	 */
 	--tracking--tight: -0.04em;
+	--tracking--snug: -0.02em;
 	--tracking--wide: 0.04em;
 
 	/* ==----------------------------------------------------
@@ -140,4 +141,14 @@
 	--text--control--font-size: calc(14 / 16 * 1rem);
 	--text--control--font-weight: var(--font-weight--regular);
 	--text--control--leading: var(--leading--normal);
+
+	/*
+	 * 発表者ビューの経過時間の数字。control と同じく枠の外に置くので rem で持つ。
+	 * 数字の幅は等幅（tabular-nums）にし、使う側で指定する
+	 */
+	--text--timer--font-family: var(--font-family--sans-serif);
+	--text--timer--font-size: 3rem;
+	--text--timer--font-weight: var(--font-weight--bold);
+	--text--timer--leading: var(--leading--tighter);
+	--text--timer--tracking: var(--tracking--snug);
 }

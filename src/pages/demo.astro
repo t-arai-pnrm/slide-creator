@@ -4,36 +4,30 @@
 import Slide from '@/components/Slide.astro'
 import Deck from '@/layouts/Deck.astro'
 
-const total = 13
+const total = 14
 
 // コードの { } を Astro の式として読ませないよう、HTML の文字列で持つ
-const cond =
-	'<span class="-k">@container</span> --scoped (<span class="-s">calc(144 / 16 * 1rem + 144px)</span> &lt;= inline-size) {'
-const scatteredCode = [
-	'._layout {',
-	`<span class="-mark">  ${cond}</span>    grid-template-columns: 96px 1fr; } }`,
-	'._thumbnail {',
-	`<span class="-mark">  ${cond}</span>    aspect-ratio: 1; } }`,
-	'._title {',
-	`<span class="-mark">  ${cond}</span>    font-size: var(--text--heading); } }`,
-].join('\n')
-const flagCode = [
-	'._title {',
-	'  font-size: var(--text--subheading);',
-	'',
-	'<span class="-mark">  <span class="-k">@container</span> <span class="-p">style(--_density: --spacious)</span> {</span>    font-size: var(--text--heading);',
-	'  }',
-	'}',
-].join('\n')
+// 枠に 2.5cqi の文字（DESIGN.md の code）で収まるよう、閾値の式は「閾値」と書いて短くする。実際の式はノートで話す
+const cond = '<span class="-k">@container</span> (<span class="-s">閾値</span> &lt;= inline-size)'
+const scatteredCode = [`._layout    ${cond}`, `._thumbnail ${cond}`, `._title     ${cond}`].join('\n')
+// 印の行（.-mark）はブロックで描くので、その後ろに改行を置くと空の行が 1 つ増える。印の行だけ改行を付けない
+const flagLines: [string, boolean][] = [
+	['._title {', false],
+	['  font-size: 小さい文字;', false],
+	['  <span class="-k">@container</span> <span class="-p">style(--_density: --spacious)</span> {', true],
+	['    font-size: 大きい文字;', false],
+	['  }', false],
+	['}', false],
+]
+const flagCode = flagLines.map(([text, mark]) => (mark ? `<span class="-mark">${text}</span>` : `${text}\n`)).join('')
 ---
 
 <Deck title="コンテナスタイルクエリでカスタムプロパティをフラグとして扱う">
-	<Slide page={1} total={total} layout="cover" chapter="CSS / 2026-11-12">
+	<Slide page={1} total={total} layout="cover" chapter="CSS — 2026-11-12">
 		<Fragment slot="title">コンテナスタイルクエリで、カスタムプロパティをフラグにする</Fragment>
 		<p>Takahiro Arai</p>
 		<p slot="notes">
-			祖先のカスタムプロパティの値を条件にして、子孫のスタイルを切り替える話。幅やホバーの状態を、1
-			か所でフラグに置き換える書き方を紹介する。
+			祖先のカスタムプロパティの値を条件にして、子孫のスタイルを切り替える話。幅やホバーの状態を、1か所でフラグに置き換える書き方を紹介する。
 		</p>
 	</Slide>
 
@@ -42,64 +36,70 @@ const flagCode = [
 		<p slot="notes">まず、サイズクエリだけで書いたときに何が困るかを見る。</p>
 	</Slide>
 
-	<Slide page={3} total={total} chapter="01 Problem">
+	<Slide page={3} total={total} chapter="01 — Problem">
 		<Fragment slot="title">同じ閾値が、子要素の数だけ並ぶ</Fragment>
-		<pre class="code-block" set:html={scatteredCode} />
+		<figure class="code-figure">
+			<figcaption class="code-label">CSS</figcaption>
+			<pre class="code-block" set:html={scatteredCode} />
+		</figure>
 		<p slot="notes">
-			記事カードで、サムネイルを横に並べ、正方形にし、題の文字を大きくする。変えたい子要素ごとのルールにサイズクエリを書くと、同じ
-			calc() の閾値が子の数だけ並ぶ。
+			記事カードで、サムネイルを横に並べ、正方形にし、題の文字を大きくする。変えたい子要素ごとのルールにサイズクエリを書くと、同じcalc()の閾値が子の数だけ並ぶ。
 		</p>
 	</Slide>
 
 	<Slide page={4} total={total} layout="statement">
-		<Fragment slot="title">1 か所でも直し忘れると、どのデザインにもない状態ができる</Fragment>
+		<Fragment slot="title">1か所でも直し忘れると、<br />デザインにない状態ができる</Fragment>
 		<p>横並びなのに、題の文字は小さいまま。</p>
 		<p slot="notes">
-			閾値をカスタムプロパティに入れて共有できればよいが、サイズクエリの条件で var() を使う書き方は、2026 年 11
-			月の時点で対象のブラウザすべてでは使えない。
+			閾値をカスタムプロパティに入れて共有できればよいが、サイズクエリの条件でvar()を使う書き方は、2026年11月の時点で対象のブラウザすべてでは使えない。
 		</p>
 	</Slide>
 
 	<Slide page={5} total={total} layout="section" chapter="02">
-		<Fragment slot="title">スタイルクエリで、判定を 1 か所にまとめる</Fragment>
+		<Fragment slot="title">スタイルクエリで、判定を1か所にまとめる</Fragment>
 		<p slot="notes">ここからが本題。幅を判定した結果を、カスタムプロパティで子孫に伝える。</p>
 	</Slide>
 
-	<Slide page={6} total={total} chapter="02 Mechanism">
+	<Slide page={6} total={total} chapter="02 — Mechanism">
 		<Fragment slot="title">幅を判定する場所と、読む場所を分ける</Fragment>
 		<div class="flow">
 			<div class="flow-item -strong">
-				<span class="flow-label">1. 判定する</span>
-				<span class="flow-text"><code>._layout</code> がサイズクエリで幅を見る</span>
+				<span class="flow-label">1. 判定する場所</span>
+				<code class="flow-code">._layout</code>
+				<span class="flow-text">サイズクエリで幅を見る</span>
 			</div>
 			<span class="flow-arrow" aria-hidden="true">→</span>
 			<div class="flow-item">
-				<span class="flow-label">2. フラグを立てる</span>
-				<span class="flow-text"><code>--_density</code> を <code>--spacious</code> にする</span>
+				<span class="flow-label">2. 伝えるフラグ</span>
+				<code class="flow-code">--_density</code>
+				<span class="flow-text">幅が広いと立てる</span>
 			</div>
 			<span class="flow-arrow" aria-hidden="true">→</span>
 			<div class="flow-item">
-				<span class="flow-label">3. 読む</span>
-				<span class="flow-text">子孫が <code>style()</code> で値を見る</span>
+				<span class="flow-label">3. 読む場所</span>
+				<code class="flow-code">style()</code>
+				<span class="flow-text">子孫が値を読む</span>
 			</div>
 		</div>
 		<p slot="notes">
-			サイズクエリを書くのは、フラグを宣言する ._layout
-			のルールだけ。フラグをルートに置かないのは、コンテナが自分の幅を条件にできないため。
+			サイズクエリを書くのは、フラグを宣言する._layoutのルールだけ。フラグをルートに置かないのは、コンテナが自分の幅を条件にできないため。
 		</p>
 	</Slide>
 
-	<Slide page={7} total={total} chapter="02 Mechanism">
+	<Slide page={7} total={total} chapter="02 — Mechanism">
 		<Fragment slot="title">子孫のルールには、閾値が出てこない</Fragment>
-		<pre class="code-block" set:html={flagCode} />
+		<figure class="code-figure">
+			<figcaption class="code-label">CSS</figcaption>
+			<pre class="code-block" set:html={flagCode} />
+		</figure>
 		<p slot="notes">
-			狭い幅の見た目はクエリなしで書き、広い幅の見た目だけを style() の中に書く。名前を付けない @container style()
-			は親を問い合わせ、継承したフラグも読める。
+			狭い幅の見た目はクエリなしで書き、広い幅の見た目だけをstyle()の中に書く。名前を付けない@container
+			style()は親を問い合わせ、継承したフラグも読める。
 		</p>
 	</Slide>
 
-	<Slide page={8} total={total} chapter="02 Mechanism">
-		<Fragment slot="title">閾値は 3 か所から 1 か所になる</Fragment>
+	<Slide page={8} total={total} chapter="02 — Mechanism">
+		<Fragment slot="title">閾値は3か所から1か所になる</Fragment>
 		<div class="compare">
 			<div class="compare-item">
 				<span class="flow-label">Before / サイズクエリだけ</span>
@@ -109,18 +109,17 @@ const flagCode = [
 			<div class="compare-item -strong">
 				<span class="flow-label">After / フラグを読む</span>
 				<span class="compare-value">閾値 × 1</span>
-				<p>判定は 1 か所、ほかは値を読むだけ</p>
+				<p>判定は1か所、ほかは値を読むだけ</p>
 			</div>
 		</div>
-		<p slot="notes">要素の見た目は、その要素のルールの中にまとまったまま。閾値の 1 か所化と両立できる。</p>
+		<p slot="notes">要素の見た目は、その要素のルールの中にまとまったまま。閾値の1か所化と両立できる。</p>
 	</Slide>
 
 	<Slide page={9} total={total} layout="statement">
 		<Fragment slot="title">ホバーとフォーカスも、フラグにして子孫に配れる</Fragment>
-		<p><code>:has()</code> で子のリンクの状態を受け、<code>--_has-hocus: --true</code> を立てる。</p>
+		<p><code>:has()</code>で子のリンクの状態を受け、<code>--_has-hocus: --true</code>を立てる。</p>
 		<p slot="notes">
-			記事一覧の行は、押せるのが題のリンクだけで、見た目を変えたいのは日付と矢印。子の状態を :has()
-			で親に上げてから、フラグで子孫に配る。
+			記事一覧の行は、押せるのが題のリンクだけで、見た目を変えたいのは日付と矢印。子の状態を:has()で親に上げてから、フラグで子孫に配る。
 		</p>
 	</Slide>
 
@@ -129,8 +128,8 @@ const flagCode = [
 		<p slot="notes">最後に、書き間違いを防ぐ決まりと、使えるブラウザを確認する。</p>
 	</Slide>
 
-	<Slide page={11} total={total} chapter="03 Rules">
-		<Fragment slot="title">値は -- で始まる識別子に、初期値はクエリの外に</Fragment>
+	<Slide page={11} total={total} chapter="03 — Rules">
+		<Fragment slot="title">値は<code>--</code>で始まる識別子に、初期値はクエリの外に</Fragment>
 		<div class="compare">
 			<div class="compare-item">
 				<span class="flow-label">避ける</span>
@@ -140,40 +139,47 @@ const flagCode = [
 			<div class="compare-item -strong">
 				<span class="flow-label">そろえる</span>
 				<span class="compare-value"><code>--true</code> / <code>--false</code></span>
-				<p>CSS のキーワードとぶつからない</p>
+				<p>CSSのキーワードとぶつからない</p>
 			</div>
 		</div>
 		<p slot="notes">
-			初期値を書かないと、外側のコンポーネントで同じ名前のフラグが立っていたときに、その値を継承してしまう。範囲の比較は
-			Safari が対応するまで使わない。
+			初期値を書かないと、外側のコンポーネントで同じ名前のフラグが立っていたときに、その値を継承してしまう。範囲の比較はSafariが対応するまで使わない。
 		</p>
 	</Slide>
 
-	<Slide page={12} total={total} chapter="03 Support">
-		<Fragment slot="title">主要なブラウザで使える</Fragment>
-		<div class="numbers">
-			<div class="numbers-item">
-				<span class="numbers-value">111</span>
-				<span class="flow-label">Chrome / Edge</span>
-			</div>
-			<div class="numbers-item">
-				<span class="numbers-value">18</span>
-				<span class="flow-label">Safari</span>
-			</div>
-			<div class="numbers-item">
-				<span class="numbers-value">151</span>
-				<span class="flow-label">Firefox</span>
-			</div>
-		</div>
+	<Slide page={12} total={total} chapter="03 — Support">
+		<Fragment slot="title">2026年5月に、主要なブラウザがそろった</Fragment>
+		<ol class="timeline">
+			<li>
+				<span class="flow-label">Chrome / Edge 111</span>
+				<span class="flow-text">最初に対応</span>
+			</li>
+			<li>
+				<span class="flow-label">Safari 18</span>
+				<span class="flow-text">続いて対応</span>
+			</li>
+			<li class="-strong">
+				<span class="flow-label">Firefox 151</span>
+				<span class="flow-text">Baselineになる</span>
+			</li>
+		</ol>
 		<p slot="notes">
-			2026 年 5 月から Baseline の「新しく利用可能」。対応していない環境では style()
-			の中が当たらず、初期値の見た目が残る。
+			2026年5月からBaselineの「新しく利用可能」。対応していない環境ではstyle()の中が当たらず、初期値の見た目が残る。
 		</p>
 	</Slide>
 
 	<Slide page={13} total={total} chapter="Source">
 		<Fragment slot="title">出典</Fragment>
-		<p>コンテナスタイルクエリでカスタムプロパティをフラグとして扱う（Takahiro Arai）</p>
-		<p><code>tak-dcxi.com/article/how-to-use-container-style-queries/</code></p>
+		<ul class="source-list">
+			<li>
+				<span>コンテナスタイルクエリでカスタムプロパティをフラグとして扱う（Takahiro Arai）</span>
+				<span class="source-url">tak-dcxi.com/article/how-to-use-container-style-queries/</span>
+			</li>
+		</ul>
+	</Slide>
+
+	<Slide page={14} total={total} layout="end" chapter="Thank you">
+		<Fragment slot="title">フラグは1か所で立て、子孫は読むだけにする</Fragment>
+		<p>Takahiro Arai</p>
 	</Slide>
 </Deck>

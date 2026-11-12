@@ -10,7 +10,7 @@
 		"astro": "astro",
 		"check": "astro check",
 		"lint": "pnpm run --parallel --aggregate-output \"/^lint:/\"",
-		"lint:oxlint": "oxlint --deny-warnings",
+		"lint:oxlint": "oxlint --deny-warnings --disable-nested-config",
 		"lint:stylelint": "stylelint \"src/**/*.{css,astro}\" --max-warnings=0",
 		"lint:markuplint": "markuplint \"src/**/*.astro\"",
 		"format": "oxfmt",

@@ -25,20 +25,10 @@ const { title } = Astro.props
 		<title>{title}</title>
 		<!-- 初期値は OS の設定にかかわらずライトにする（発表者の OS がダークのまま映す失敗を防ぐため）。切り替えはこの content を書き換える -->
 		<meta name="color-scheme" content="light only" />
-		<!-- 和文の Noto Sans JP（400、700）は、DESIGN.md の決めごとで、欧文と違い埋め込まず Google Fonts から読み込む。通信できない場所では OS の書体で出る -->
-		<link rel="preconnect" href="https://fonts.googleapis.com" />
-		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-		<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" />
-		<!--
-			コンポーネントの style 要素がどの順で出力されても、レイヤーの順番がこの宣言で決まるよう、Astro が head の末尾に足す CSS より前に置く。
-			Google Fonts の CSS は @font-face だけでレイヤーを使わないので、その後ろでよい
-		-->
-		<style is:inline>
-			@layer tokens, reset, base, vendors, compositions, pages, components, patterns, utilities;
-		</style>
 		<!--
 			保存したテーマを、最初の描画の前に当てる。モジュールの script は描画のあとに動くので、ライトで描いてからダークに替わり、ちらつくため。
-			markuplint の head-element-order に合わせて head の末尾に置くが、body より前なので描画の前に動く。
+			書き換える color-scheme の meta より後ろ、スタイルシートの link より前に置く。link の後ろに置くと、Google Fonts の CSS が届くまで実行が待たされる。
+			Astro が埋め込む CSS は head の末尾に入り、この script より後ろになるので、.markuplintrc の head-element-order は script を link と style より前に並べる順にしている。
 			localStorage は、プライベートブラウズや保存を禁じた設定で例外になるので、そのときは初期値のまま描く
 		-->
 		<script is:inline define:vars={{ storageKey: COLOR_SCHEME_STORAGE_KEY, schemes: COLOR_SCHEMES }}>
@@ -51,6 +41,17 @@ const { title } = Astro.props
 				// 初期値のライトで描く
 			}
 		</script>
+		<!-- 和文の Noto Sans JP（400、700）は、DESIGN.md の決めごとで、欧文と違い埋め込まず Google Fonts から読み込む。通信できない場所では OS の書体で出る -->
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" />
+		<!--
+			コンポーネントの style 要素がどの順で出力されても、レイヤーの順番がこの宣言で決まるよう、Astro が head の末尾に足す CSS より前に置く。
+			Google Fonts の CSS は @font-face だけでレイヤーを使わないので、その後ろでよい
+		-->
+		<style is:inline>
+			@layer tokens, reset, base, vendors, compositions, pages, components, patterns, utilities;
+		</style>
 	</head>
 	<body>
 		<!-- 発表者ビューで画面の上の端に置くので、読む順もスライドより前にする -->
@@ -106,6 +107,29 @@ const { title } = Astro.props
 
 			&:has(> .deck[data-view='present'][data-notes='shown']) > :global(.deck-controls) {
 				--_stage-block-size: calc(100svb * (1 - var(--_notes-share)));
+			}
+
+			/*
+			 * 発表者ビューの経過時間（PresenterTimer）を、画面の上の端に、端から離して置く。
+			 * 画面の端からの余白は置き場所で決まるので、PresenterTimer のルートではなく、置く側のここに書く
+			 * （no-external-layout-on-root、parent-owns-child-placement）。発表者ビューのとき以外は hidden で出ない。
+			 * 上の余白は body の内側の余白で、デッキとの間は次兄弟のデッキの margin で作り、どちらも 1rem にする
+			 * （margin-collapse-padding-for-inner-space、block-margin-with-sibling-combinator）
+			 */
+			& > :global(.presenter-timer) {
+				margin-inline: 1rem;
+			}
+
+			/*
+			 * hidden の経過時間も兄弟に数えるので、デッキの上の margin と body の上の余白は、
+			 * 経過時間を出す発表者ビューのときだけにする
+			 */
+			&:has(> .deck[data-view='presenter']) {
+				padding-block-start: 1rem;
+
+				& > :global(.presenter-timer) + .deck {
+					margin-block-start: 1rem;
+				}
 			}
 		}
 

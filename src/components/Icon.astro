@@ -1,0 +1,76 @@
+---
+/**
+ * 線で描くアイコン。ふつうは飾りなので支援技術からは隠し、意味はそばの文字か、ボタンの見えない名前で伝える。
+ * 見た目の文字にない意味をアイコンが表すときは、alt に渡すと role="img" と aria-label で伝える。
+ * 形は Lucide（ISC License, https://lucide.dev/license）から写した。依存を増やさないよう、パッケージは入れない。
+ * 色は svg 要素の属性で currentColor にし、文字色に合わせる（icon-current-color）。
+ *
+ * @prop {IconName} name - アイコンの名前
+ * @prop {string} [alt] - 支援技術に伝える名前。省くと飾りとして隠す
+ * @prop {string} [lang] - alt の言語。英語の要素の中で和文の alt を渡すときに 'ja' を指定する
+ * @prop {<length>} --icon--size [1em] - 幅と高さ
+ * @prop {<color>} --icon--forced-color [CanvasText] - 強制カラーモードでの線の色。ボタンの中では ButtonText のように、置く場所に合ったシステムカラーを渡す
+ */
+const ICONS = {
+	'chevron-left': '<path d="m15 18-6-6 6-6"/>',
+	'chevron-right': '<path d="m9 18 6-6-6-6"/>',
+	'file-text':
+		'<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
+	maximize:
+		'<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
+	moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+	presentation: '<path d="M2 3h20"/><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"/><path d="m7 21 5-5 5 5"/>',
+	'rotate-ccw': '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+} as const
+
+export type IconName = keyof typeof ICONS
+
+type Props = {
+	name: IconName
+	alt?: string | undefined
+	lang?: string | undefined
+}
+
+const { name, alt, lang } = Astro.props
+---
+
+<svg
+	class="icon"
+	viewBox="0 0 24 24"
+	fill="none"
+	stroke="currentColor"
+	stroke-width="2"
+	stroke-linecap="round"
+	stroke-linejoin="round"
+	role={alt ? 'img' : undefined}
+	aria-label={alt}
+	aria-hidden={alt ? undefined : 'true'}
+	lang={alt ? lang : undefined}
+	set:html={ICONS[name]}
+/>
+
+<style>
+	@layer components {
+		/*
+		 * 文の中に置くときは、アイコンの中央を大文字の高さ（1cap）の中央にそろえる。和文の字面の中央（ベースラインから約 0.38em）とほぼ重なる。
+		 * 決め打ちの値と違い、書体やアイコンの大きさが変わっても追従する。並びの中ではアイテムになり、この指定は使われない
+		 */
+		.icon {
+			--_size: var(--icon--size, 1em);
+			--_forced-color: var(--icon--forced-color, CanvasText);
+
+			inline-size: var(--_size);
+			aspect-ratio: 1;
+			vertical-align: calc((1cap - var(--_size)) / 2);
+
+			/*
+			 * 強制カラーモードでは、currentColor の線がシステムカラーにならない環境があるので、線の色をシステムカラーに固定する。
+			 * 線だけで描くアイコンなので、fill は none のまま触らない（forced-colors-svg-system-colors）
+			 */
+			@media (forced-colors: active) {
+				/* stylelint-disable-next-line declaration-no-important -- 強制カラーモードで線の色を必ずシステムカラーにするため（important-only-for-guarantees） */
+				stroke: var(--_forced-color) !important;
+			}
+		}
+	}
+</style>

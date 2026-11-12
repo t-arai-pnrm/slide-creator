@@ -14,4 +14,10 @@
 	--duration--fast: 80ms;
 	--duration--base: 160ms;
 	--duration--slow: 240ms;
+
+	/* 要素を順に出すときに、次の要素までずらす時間 */
+	--duration--stagger: 60ms;
+
+	/* 要素を順に出すときに、上へ動かす距離（枠の幅に対する割合） */
+	--distance--enter: 0.6cqi;
 }

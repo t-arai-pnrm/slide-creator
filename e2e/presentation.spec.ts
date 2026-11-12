@@ -1,9 +1,19 @@
 // 発表のための操作（src/scripts/deck.ts）を確かめる。
 // 横長の画面で JavaScript が動くときだけ 1 枚ずつ表示し、縦長の画面と JavaScript が動かない環境では縦に並べた形のままにする。
-// 見本のデッキ（src/pages/index.astro）は 4 枚で、4 枚目にだけリンクがある
+// 見本のデッキ（src/pages/index.astro）は、最後の 1 枚にだけリンクがある
+import { readFileSync } from 'node:fs'
+
 import { expect, test, type Page } from '@playwright/test'
 
-const TOTAL = 4
+// 枚数は、見本のデッキの `const total = …` から読む。テストの名前（#99 を寄せる先）にも使うので、ページを開く前に決める。
+// 実際のスライドの数と食い違えば、縦に並べた形のテスト（expectScrollView）で落ちる
+const readTotal = () => {
+	const source = readFileSync(new URL('../src/pages/index.astro', import.meta.url), 'utf8')
+	const match = /^const total = (\d+)$/m.exec(source)
+	if (!match?.[1]) throw new Error('src/pages/index.astro に `const total = <数>` が見つからない')
+	return Number(match[1])
+}
+const TOTAL = readTotal()
 const LANDSCAPE = { width: 1280, height: 720 }
 const PORTRAIT = { width: 375, height: 812 }
 // DESIGN.md の「操作の部分」の、マウスを止めてから隠すまでの時間
@@ -25,6 +35,22 @@ const expectCurrent = async (page: Page, pageNumber: number) => {
 	await expect(controls(page).locator('[data-deck-current]')).toHaveText(String(pageNumber))
 }
 
+/** 経過時間のテストで固定する時刻。値に意味はなく、ずらした分だけが経過時間になる */
+const TIMER_START = Date.UTC(2026, 0, 1)
+
+/** 経過時間の見える 4 桁（分 2 桁、秒 2 桁）の --_value が、values のとおりであることを確かめる */
+const expectTimerDigits = async (page: Page, values: readonly number[]) => {
+	await expect
+		.poll(() =>
+			page
+				.locator('.presenter-timer [data-timer-digit]')
+				.evaluateAll((digits) =>
+					digits.map((digit) => (digit instanceof HTMLElement ? digit.style.getPropertyValue('--_value') : '')),
+				),
+		)
+		.toEqual(values.map(String))
+}
+
 test.describe('横長の画面', () => {
 	test.use({ viewport: LANDSCAPE })
 
@@ -34,7 +60,7 @@ test.describe('横長の画面', () => {
 		await expectCurrent(page, 1)
 		await expect(controls(page)).toBeVisible()
 		await expect(controls(page).locator('._position')).toHaveText(`スライド 1 / ${TOTAL}`)
-		await expect(deck(page)).toHaveCSS('--deck--progress', String(1 / TOTAL))
+		await expect(deck(page)).toHaveCSS('--deck-controls--progress', String(1 / TOTAL))
 	})
 
 	test('今のスライドだけが見える', async ({ page }) => {
@@ -67,7 +93,7 @@ test.describe('横長の画面', () => {
 		await expectCurrent(page, TOTAL)
 		await page.keyboard.press('Home')
 		await expectCurrent(page, 1)
-		await expect(deck(page)).toHaveCSS('--deck--progress', String(1 / TOTAL))
+		await expect(deck(page)).toHaveCSS('--deck-controls--progress', String(1 / TOTAL))
 	})
 
 	test('移っても履歴を積まない', async ({ page }) => {
@@ -220,23 +246,45 @@ test.describe('横長の画面', () => {
 		await expect(colorScheme(page)).toHaveAttribute('content', 'dark only')
 	})
 
-	test('ボタンの名前は文字のラベルで、キーは aria-keyshortcuts で伝える', async ({ page }) => {
+	test('ボタンの名前は見えない文字で、キーは aria-keyshortcuts で伝え、名前とキーは読み上げないツールチップで見せる', async ({
+		page,
+	}) => {
 		await page.goto('/')
 		const expected = [
-			{ name: '前へ', shortcuts: 'ArrowLeft PageUp Shift+Space' },
-			{ name: '次へ', shortcuts: 'ArrowRight PageDown Space' },
-			{ name: 'ノート', shortcuts: 'N' },
-			{ name: '全画面', shortcuts: 'F' },
-			{ name: '発表者ビュー', shortcuts: 'P' },
-			{ name: 'ダーク', shortcuts: 'D' },
+			{ name: '前へ', shortcuts: 'ArrowLeft PageUp Shift+Space', key: '←' },
+			{ name: '次へ', shortcuts: 'ArrowRight PageDown Space', key: '→' },
+			{ name: 'ノート', shortcuts: 'N', key: 'N' },
+			{ name: '全画面', shortcuts: 'F', key: 'F' },
+			{ name: '発表者ビュー', shortcuts: 'P', key: 'P' },
+			{ name: 'ダーク', shortcuts: 'D', key: 'D' },
 		]
 		await Promise.all(
-			expected.map(async ({ name, shortcuts }) => {
+			expected.map(async ({ name, shortcuts, key }) => {
+				// 中身の文字で探し、名前がその文字だけになる（キーやツールチップの文字が名前に混ざらない）ことを確かめる
 				const button = controls(page).locator('button', { hasText: name })
 				await expect(button).toHaveAccessibleName(name)
 				await expect(button).toHaveAttribute('aria-keyshortcuts', shortcuts)
+				// ブラウザのツールチップは使わない
+				await expect(button).not.toHaveAttribute('title')
+				const tooltip = button.locator('._tooltip')
+				await expect(tooltip).toHaveAttribute('aria-hidden', 'true')
+				await expect(tooltip).toHaveText(`${name}${key}`)
+				await expect(tooltip.locator('kbd')).toHaveText(key)
+				// アイコンは飾りなので、読み上げから隠す
+				await expect(button.locator('svg')).toHaveAttribute('aria-hidden', 'true')
 			}),
 		)
+	})
+
+	test('ハイライトは帯の擬似要素で 1 つだけ描き、読み上げない', async ({ page }) => {
+		await page.goto('/')
+		// ハイライトは飾りなので、マークアップに要素を置かず、帯の ::before で描く
+		await expect(controls(page).locator('._highlight')).toHaveCount(0)
+		// content が空の文字列で始まれば、擬似要素が描かれ、読み上げる文字もない（代替の文字を付けた形 `"" / ""` も含む）
+		const content = await controls(page).evaluate((element) => getComputedStyle(element, '::before').content)
+		expect(content).toMatch(/^""/)
+		// 矢印キーはスライドの移動に使うので、帯をツールバーにしない
+		await expect(controls(page).getByRole('toolbar')).toHaveCount(0)
 	})
 
 	test('全画面に対応していれば全画面のボタンを出し、対応していなければ出さない', async ({ page }) => {
@@ -247,7 +295,7 @@ test.describe('横長の画面', () => {
 
 	test('見えないスライドにはフォーカスが移らない', async ({ page }) => {
 		await page.goto('/')
-		// 4 枚目にだけリンクがある。1 枚目を表示している間は、Tab で一周してもそのリンクに止まらない
+		// 最後のスライドにだけリンクがある。1 枚目を表示している間は、Tab で一周してもそのリンクに止まらない
 		await expect(lastSlideLink(page)).toHaveCount(1)
 		for (let i = 0; i < 12; i++) {
 			// Tab は前の Tab の位置から進むので、順に押す
@@ -259,7 +307,7 @@ test.describe('横長の画面', () => {
 			)
 			expect(isInHiddenSlide).toBe(false)
 		}
-		// 4 枚目に移ると、そのリンクにフォーカスできる
+		// 最後のスライドに移ると、そのリンクにフォーカスできる
 		await page.keyboard.press('End')
 		await lastSlideLink(page).focus()
 		await expect(lastSlideLink(page)).toBeFocused()
@@ -389,17 +437,44 @@ test.describe('発表者ビュー', () => {
 	})
 
 	test('経過時間を分と秒で出し、ボタンで 0 に戻す', async ({ page }) => {
-		await page.clock.install()
+		// Date.now() を固定し、時間はテストが進めた分だけ経つようにする。
+		// install() のままでは時計が実時間でも進み、遅いブラウザ（Firefox）で 1 秒ずれて失敗することがあったため。
+		// 1 秒ごとの描き直しは本物のタイマーで動くので、固定した時刻を進めたあとの表示を待てる
+		await page.clock.setFixedTime(TIMER_START)
 		await page.goto('/?presenter')
 		const timer = page.locator('.presenter-timer')
-		const elapsed = timer.locator('time')
+		const elapsed = timer.getByRole('timer').locator('time')
 		await expect(timer).toBeVisible()
-		await expect(elapsed).toHaveText('00:00')
-		await page.clock.runFor('01:05')
-		await expect(elapsed).toHaveText('01:05')
+		await expect(elapsed).toHaveText('0 分 0 秒')
+		await expectTimerDigits(page, [0, 0, 0, 0])
+
+		await page.clock.setFixedTime(TIMER_START + 65_000)
+		await expect(elapsed).toHaveText('1 分 5 秒')
 		await expect(elapsed).toHaveAttribute('datetime', 'PT1M5S')
-		await timer.getByRole('button', { name: '時間を 0 に戻す' }).click()
-		await expect(elapsed).toHaveText('00:00')
+		await expectTimerDigits(page, [0, 1, 0, 5])
+
+		const reset = timer.getByRole('button', { name: '時間を 0に戻す', exact: true })
+		// 見えるラベルが名前に含まれる（WCAG 2.5.3）。
+		// 見えない「時間を」は position: fixed で block になるので、名前の計算で後ろに空白が入る
+		await expect(reset).toContainText('0に戻す')
+		await reset.click()
+		await expect(elapsed).toHaveText('0 分 0 秒')
+		await expectTimerDigits(page, [0, 0, 0, 0])
+	})
+
+	test('99 分を超えると、見える数字は 99:59 で止め、読み上げは実際の時間を伝える', async ({ page }) => {
+		await page.clock.setFixedTime(TIMER_START)
+		await page.goto('/?presenter')
+		await page.clock.setFixedTime(TIMER_START + (100 * 60 + 5) * 1000)
+		const elapsed = page.getByRole('timer').locator('time')
+		await expect(elapsed).toHaveText('100 分 5 秒')
+		await expect(elapsed).toHaveAttribute('datetime', 'PT100M5S')
+		await expectTimerDigits(page, [9, 9, 5, 9])
+	})
+
+	test('経過時間の見える数字は読み上げない', async ({ page }) => {
+		await page.goto('/?presenter')
+		await expect(page.getByRole('timer').locator('._digits')).toHaveAttribute('aria-hidden', 'true')
 	})
 
 	test('2 つのウィンドウのどちらで移っても、両方が同じスライドに移る', async ({ context }) => {

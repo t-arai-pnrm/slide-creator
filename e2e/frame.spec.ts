@@ -11,7 +11,7 @@ const BODY_MIN_RATIO = 0.025
 
 const frames = (page: Page) => page.locator('.slide ._frame')
 const notes = (page: Page) => page.locator('.slide ._notes')
-// src/pages/index.astro の見本のデッキは、最後の 1 枚だけノートを書かない
+// src/pages/index.astro の見本のデッキは、最後の 1 枚にノートを書かない（ほかにもノートのないスライドがある）
 const slideWithoutNotes = (page: Page) => page.locator('section.slide').last()
 
 // 画面の幅と高さは、スクロールバーを除いた表示領域で測る。スクロールバーの下に枠が隠れると、収まっていないため

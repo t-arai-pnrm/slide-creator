@@ -58,12 +58,22 @@ const isInteractive = (target: EventTarget | null) =>
 	target instanceof Element &&
 	target.closest('a[href], button, summary, label, input, textarea, select, [contenteditable], [tabindex]') !== null
 
+/** 見える数字は分 2 桁なので、99 分 59 秒が出せる最大の値 */
+const MAX_SHOWN_SECONDS = 99 * 60 + 59
+
 const formatElapsed = (ms: number) => {
 	const totalSeconds = Math.floor(ms / 1000)
 	const minutes = Math.floor(totalSeconds / 60)
 	const seconds = totalSeconds % 60
+	// 99 分を超えたら、見える数字は 99:59 で止め、読み上げの文字と datetime は実際の値を書き続ける。
+	// 3 桁目を足すと発表の途中でカードの幅が変わり、00:00 へ巡回させると始めたばかりと見誤るため。
+	// 登壇の多くは 99 分に収まるので、止まった数字は時間を大きく過ぎた合図として読める
+	const shownSeconds = Math.min(totalSeconds, MAX_SHOWN_SECONDS)
+	const shown = `${String(Math.floor(shownSeconds / 60)).padStart(2, '0')}${String(shownSeconds % 60).padStart(2, '0')}`
 	return {
-		text: `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`,
+		/** 見える 4 桁（分 2 桁、秒 2 桁）の値 */
+		digits: Array.from(shown, Number),
+		text: `${minutes} 分 ${seconds} 秒`,
 		datetime: `PT${minutes}M${seconds}S`,
 	}
 }
@@ -125,7 +135,7 @@ export const initDeck = (): void => {
 		const page = index + 1
 		if (currentLabel) currentLabel.textContent = String(page)
 		// 操作の部分は main.deck の外にあるので、両方に継承されるよう文書のルートに書く
-		document.documentElement.style.setProperty('--deck--progress', String(page / total))
+		document.documentElement.style.setProperty('--deck-controls--progress', String(page / total))
 		button('prev')?.setAttribute('aria-disabled', String(index === 0))
 		button('next')?.setAttribute('aria-disabled', String(index === total - 1))
 	}
@@ -210,12 +220,21 @@ export const initDeck = (): void => {
 
 	let timerStart = Date.now()
 	const elapsed = timer ? queryHTMLElement(timer, 'time') : null
+	const timerDigits = timer
+		? Array.from(timer.querySelectorAll('[data-timer-digit]')).filter(
+				(element): element is HTMLElement => element instanceof HTMLElement,
+			)
+		: []
 
 	const renderTimer = () => {
-		if (!elapsed) return
-		const { text, datetime } = formatElapsed(Date.now() - timerStart)
-		elapsed.textContent = text
-		elapsed.setAttribute('datetime', datetime)
+		const { digits, text, datetime } = formatElapsed(Date.now() - timerStart)
+		if (elapsed) {
+			elapsed.textContent = text
+			elapsed.setAttribute('datetime', datetime)
+		}
+		timerDigits.forEach((digit, i) => {
+			digit.style.setProperty('--_value', String(digits[i] ?? 0))
+		})
 	}
 
 	const resetTimer = () => {
