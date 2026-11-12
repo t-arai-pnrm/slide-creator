@@ -20,6 +20,7 @@ slide-creator は、記事やマークダウンから登壇用の HTML のスラ
 - `pnpm test` - 型の検査（`astro check`）、全リンター、整形の検査、`scripts/` の単体のテスト（`test:unit`）。プッシュ前に Lefthook が実行する
 - `pnpm build` - 最後に `scripts/inline-decks.ts` が、各デッキの CSS、スクリプト、欧文の書体、画像を埋め込み、`dist/<slug>.html` の 1 ファイルにする。配るのはこのファイル
 - `pnpm test:html` と `pnpm test:e2e` - ビルドした `dist` を試すので、先に `pnpm build` を実行する
+- `pnpm ingest <URL かパス>` - 記事を `slides/<slug>/source.md` に全文で取り込む。HTML の解析は依存を足さずに書いているので、崩れる記事がありうる
 - `pnpm verify` - PR の前の検証。`test`、`build`、`test:html`、`test:e2e` を順に実行し、結果を HEAD のハッシュと一緒に `.claude/logs/receipts/` に記録する。未コミットの変更があると記録は無効になる
 
 ## 作業ごとの文書
@@ -38,6 +39,7 @@ slide-creator は、記事やマークダウンから登壇用の HTML のスラ
 
 - リポジトリを変える作業は、dev-flow のスキルの手順で、計画から PR まで進める。メインのセッションは調整役として、`src/` のコードを作る係（`builder`）に書かせる
 - CSS は、1 行の修正でも css-change のスキルの手順で書く
+- 記事からスライドの原稿を作るときは、`/create-slide <URL かパス> [--minutes 20] [--yes]` を使う。取り込み、通読、構成案（ユーザーの承認で止まる）、執筆、ビルドと検査、レビューの順に、係（`article-reader`、`deck-writer`、`deck-reviewer`）に任せて進む。原稿と素材は `slides/<slug>/` に置く
 - 日本語の文書とコミットメッセージは、japanese-tech-writing に沿って書き、yomiyasu で推敲する
 - 手順を強制する hook はない。上の決まりは、メインのセッションが自分で守る
 
