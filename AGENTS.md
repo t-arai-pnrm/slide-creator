@@ -17,7 +17,7 @@ slide-creator は、記事やマークダウンから登壇用の HTML のスラ
 
 パッケージマネージャーは pnpm です（`npm` / `npx` は使わない。一度だけ実行するパッケージは `pnpm dlx`）。スクリプトの一覧は `package.json` にあります。ここには、一覧から読み取れない点だけを書きます。
 
-- `pnpm test` - 型の検査（`astro check`）、全リンター、整形の検査。プッシュ前に Lefthook が実行する
+- `pnpm test` - 型の検査（`astro check`）、全リンター、整形の検査、`scripts/` の単体のテスト（`test:unit`）。プッシュ前に Lefthook が実行する
 - `pnpm build` - 最後に `scripts/inline-decks.ts` が、各デッキの CSS、スクリプト、欧文の書体、画像を埋め込み、`dist/<slug>.html` の 1 ファイルにする。配るのはこのファイル
 - `pnpm test:html` と `pnpm test:e2e` - ビルドした `dist` を試すので、先に `pnpm build` を実行する
 - `pnpm verify` - PR の前の検証。`test`、`build`、`test:html`、`test:e2e` を順に実行し、結果を HEAD のハッシュと一緒に `.claude/logs/receipts/` に記録する。未コミットの変更があると記録は無効になる
