@@ -1,6 +1,6 @@
 /**
  * 起点のない `:has()`（`:has(.foo)` や `*:has(.foo)`）を禁止するルール。
- * 出典: RECSSガイドラインのリポジトリの stylelint/no-unanchored-has.mjs（v0.83.2）
+ * 出典: RECSSガイドラインのリポジトリの stylelint/no-unanchored-has.mjs（v0.84.0）
  *
  * `:has()` の直前に起点となるセレクタがないと、すべての要素が照合の対象になり、
  * DOM が変わるたびのスタイルの再計算が重くなる（第5章「:has() で祖先と前の兄弟を選ぶ」）。
