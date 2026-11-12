@@ -2,13 +2,23 @@
 
 AI コーディングエージェント向けの規約です。`CLAUDE.md` はこのファイルへのシンボリックリンクです。
 
-slide-creator は、記事やマークダウンから登壇用の HTML のスライドを作るツールです。Astro でビルドし、1 つのデッキを 1 つの HTML にします。
+slide-creator は、記事やマークダウンから登壇用の HTML のスライドを作るツールです。Astro でビルドし、1 つのデッキを 1 つの HTML にします。デッキの原稿は `slides/<slug>/deck.mdx` に書き、`/<slug>/` のページになります。
+
+## スライドの原稿の書き方
+
+`slides/<slug>/deck.mdx` は、frontmatter の `title` と `<Slide>` だけで書く。ビルドの処理が原稿の文字列を読むので、次を守る。
+
+- `<Slide` は字下げせず、行の先頭に書く。ページ番号（`page`）と枚数（`total`）は書かない。ビルドのときに `scripts/vite-plugin-slide-numbers.ts` が数えて足す
+- ノートの `<p slot="notes">` は 1 行で書く。中で改行すると、MDX が中の文を段落として `<p>` で包み、`<p>` の中に `<p>` ができる
+- slug に `index` と `404` は使わない。`dist/` のほかのページと同じ名前になる
+- `{ }` を含むコードは、`export const` で HTML の文字列にし、`<pre set:html={…} />` で渡す（`slides/demo/deck.mdx` が例）
 
 ## コマンド
 
 パッケージマネージャーは pnpm です（`npm` / `npx` は使わない。一度だけ実行するパッケージは `pnpm dlx`）。スクリプトの一覧は `package.json` にあります。ここには、一覧から読み取れない点だけを書きます。
 
-- `pnpm test` - 型の検査（`astro check`）、全リンター、整形の検査。プッシュ前に Lefthook が実行する
+- `pnpm test` - 型の検査（`astro check`）、全リンター、整形の検査、`scripts/` の単体のテスト（`test:unit`）。プッシュ前に Lefthook が実行する
+- `pnpm build` - 最後に `scripts/inline-decks.ts` が、各デッキの CSS、スクリプト、欧文の書体、画像を埋め込み、`dist/<slug>.html` の 1 ファイルにする。配るのはこのファイル
 - `pnpm test:html` と `pnpm test:e2e` - ビルドした `dist` を試すので、先に `pnpm build` を実行する
 - `pnpm verify` - PR の前の検証。`test`、`build`、`test:html`、`test:e2e` を順に実行し、結果を HEAD のハッシュと一緒に `.claude/logs/receipts/` に記録する。未コミットの変更があると記録は無効になる
 

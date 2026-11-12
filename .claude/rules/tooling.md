@@ -29,6 +29,8 @@ paths:
 - **フォーマッター**: Oxfmt（`.oxfmtrc.jsonc`）。`.md` と `.mdx` はすべて整形しない（スライドの原稿、AGENTS.md を含む）
 - **TypeScript**: 6 系。TypeScript 7 は `astro check` が未対応のため使わない
   - `exactOptionalPropertyTypes` では、省略できるプロパティに `undefined` を渡せない。値がないかもしれないものを渡す props は `?: T | undefined` と書く
+- **単体のテスト**: Node の `node:test`（`pnpm test:unit`。`pnpm test` の最後に実行し、pre-push でも動く）。テストは `scripts/` に `*.test.ts` で置き、`scripts/` の判定の関数を試す。Vitest は入れていない。`describe` と `it` は Oxlint の `no-floating-promises` に当たるので、`await test(...)` の形で書く
+  - import するとすぐ処理を始めるスクリプトは、処理の部分を `if (import.meta.main)` で包み、判定の関数を export する（`scripts/inline-decks.ts`）
 - **ブラウザのテスト**: Playwright（`playwright.config.ts`）。テストは `e2e/` に `*.spec.ts` で置き、Chromium、Firefox、WebKit で動かす。手元で初めて動かすときは `pnpm exec playwright install` でブラウザを入れる
   - サーバーは `astro preview --ignore-lock` を 127.0.0.1:4370 で毎回起こす。`--ignore-lock` がないと、ほかの preview が動いているときや、エージェントから実行したとき（バックグラウンドに回る）に起動しない
   - 失敗したときの記録は `node_modules/.cache/playwright` に置く（`.gitignore` を変えずに Git から外すため）
