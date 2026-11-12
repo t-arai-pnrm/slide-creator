@@ -4,4 +4,12 @@ import { defineConfig } from 'astro/config'
 export default defineConfig({
 	// Astro 7 の既定（'jsx'）は要素間の空白を消すため、HTML と同じ空白の扱いにする（taklog と同じ）
 	compressHTML: true,
+	vite: {
+		build: {
+			// CSS を圧縮する Lightning CSS の対象ブラウザを .browserslistrc にそろえる。既定（baseline-widely-available）のままだと、
+			// light-dark() を --lightningcss-light / --lightningcss-dark を使う形に書き換える。この 2 つの変数は CSS に color-scheme を
+			// 書いた場所にしか定義されず、このプロジェクトは <meta name="color-scheme"> で切り替えるので、明暗のトークンがすべて無効になる
+			cssTarget: ['chrome140', 'edge140', 'firefox143', 'safari26', 'ios26'],
+		},
+	},
 })

@@ -1,0 +1,27 @@
+/**
+ * 余白のトークン。値は DESIGN.md の「枠線」と「余白」の表を写す。
+ * スライドの中の余白は、文字と同じく枠の幅に対する割合（cqi）で持ち、
+ * 枠の大きさに比例させる。
+ * cqi を書いたままの形で継承させるため、@property で登録しない
+ * （理由は typography.css の説明を参照）。
+ *
+ * @example
+ * padding-inline: var(--guide--inline);
+ * margin-block-start: var(--spacing--md);
+ */
+:root {
+	/*
+	 * 枠の端から、要素をそろえる見えない枠線（ガイド）までの余白
+	 */
+	--guide--inline: 5cqi;
+	--guide--block: 4cqi;
+
+	/*
+	 * ブロックの上にだけ付ける余白の段階。下にも付けると、
+	 * 隣のブロックの余白と重なって、間隔がどの段階にも当たらなくなる
+	 */
+	--spacing--xs: 1cqi;
+	--spacing--sm: 2cqi;
+	--spacing--md: 3cqi;
+	--spacing--lg: 5cqi;
+}

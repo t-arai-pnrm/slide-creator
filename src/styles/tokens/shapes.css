@@ -1,0 +1,19 @@
+/**
+ * 角丸と線の太さのトークン。値は DESIGN.md の「形」の表を写す。
+ * 枠の幅に対する割合（cqi）で持ち、枠の大きさに比例させる。
+ * cqi を書いたままの形で継承させるため、@property で登録しない（理由は typography.css の説明を参照）。
+ *
+ * @example
+ * border: var(--line-width--thin) solid var(--border--base);
+ * border-radius: var(--rounded--sm);
+ */
+:root {
+	/* 角丸はこの1段階だけにし、丸薬形を作らない */
+	--rounded--sm: 0.4cqi;
+
+	/*
+	 * 線の太さ。罫線のほか、強調の下線や図の線にも使う
+	 */
+	--line-width--thin: 0.1cqi;
+	--line-width--thick: 0.3cqi;
+}

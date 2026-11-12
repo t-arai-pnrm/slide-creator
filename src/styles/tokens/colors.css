@@ -1,0 +1,106 @@
+/**
+ * 色のトークン。値は DESIGN.md の「色」の表を写す。
+ * プリミティブ（--color--*）と役割（--background--*、
+ * --foreground--*、--accent--*、--border--*、--syntax--*）の
+ * 2層にし、コンポーネントからは役割だけを参照する
+ * （color-token-two-layers）。
+ * 明暗は役割の側に light-dark() で持たせる
+ * （light-dark-in-semantic-tokens）。どちらの値になるかは
+ * <meta name="color-scheme"> の content で決まるので、
+ * この層では color-scheme を宣言しない。
+ */
+:root {
+	/* ==----------------------------------------------------
+	 * プリミティブ
+	 * ---------------------------------------------------- */
+
+	/*
+	 * 紙の色。わずかに黄みのあるニュートラル
+	 */
+	--color--sand--50: oklch(97% 0.007 88.6deg);
+	--color--sand--100: oklch(93.7% 0.01 87.5deg);
+	--color--sand--150: oklch(92.8% 0.008 91.5deg);
+	--color--sand--300: oklch(74% 0.012 89.8deg);
+	--color--sand--600: oklch(50.1% 0.013 84.6deg);
+
+	/*
+	 * 墨の色。わずかに緑みのあるニュートラル
+	 */
+	--color--ink--800: oklch(24.5% 0.005 145.4deg);
+	--color--ink--900: oklch(19.9% 0.003 145.5deg);
+	--color--ink--950: oklch(19.1% 0 none);
+
+	/*
+	 * アクセントの深緑
+	 */
+	--color--green--400: oklch(73.4% 0.111 163.1deg);
+	--color--green--700: oklch(47.3% 0.088 164.8deg);
+
+	/* ==----------------------------------------------------
+	 * 役割
+	 * ---------------------------------------------------- */
+
+	/*
+	 * 面。影を使わないので、手前の面（surface）はダークで明るく、ライトで暗くして、
+	 * 明るさの差だけで区切る（lighter-surface-in-dark-mode）
+	 */
+	--background--base: light-dark(var(--color--sand--50), var(--color--ink--900));
+	--background--surface: light-dark(var(--color--sand--100), var(--color--ink--800));
+
+	/*
+	 * 文字の色はこの2つだけにする（two-text-colors）。
+	 * muted は 9:1 に届かないので本文に使わない
+	 */
+	--foreground--base: light-dark(var(--color--ink--950), var(--color--sand--150));
+	--foreground--muted: light-dark(var(--color--sand--600), var(--color--sand--300));
+
+	/* 9:1 に届かないので、文字の色には使わず、線や枠のような文字でない部品にだけ使う */
+	--accent--base: light-dark(var(--color--green--700), var(--color--green--400));
+
+	/*
+	 * 罫線。細い線は文字の色を半透明にして、base と surface のどちらの面の上でも
+	 * 同じだけの差で見えるようにする（relative-color-for-single-color）
+	 */
+	--border--base: light-dark(
+		oklch(from var(--color--ink--950) l c h / 12%),
+		oklch(from var(--color--sand--150) l c h / 19%)
+	);
+	--border--strong: var(--foreground--base);
+
+	/* ==----------------------------------------------------
+	 * コードの色分け
+	 * ---------------------------------------------------- */
+
+	/*
+	 * 色分けを 9:1 まで濃くすると地の文字と見分けられなくなるので、
+	 * 地の文字（foreground）を除き、基準は 4.5:1 にしている
+	 * （text-contrast-aa）。比は DESIGN.md の表にあり、
+	 * 値を変えたら計算し直す。
+	 * comment は区切り記号にも、keyword は関数名にも、
+	 * string は定数にも使う
+	 */
+	--syntax--foreground: var(--foreground--base);
+	--syntax--comment: light-dark(oklch(44.1% 0.013 84.6deg), oklch(76% 0.012 89.8deg));
+	--syntax--keyword: light-dark(oklch(41% 0.1 305deg), oklch(81% 0.07 305deg));
+	--syntax--tag: light-dark(oklch(41.3% 0.088 164.8deg), oklch(75.4% 0.111 163.1deg));
+	--syntax--property: light-dark(oklch(41% 0.09 250deg), oklch(80% 0.075 245deg));
+	--syntax--string: light-dark(oklch(44% 0.11 45deg), oklch(81% 0.08 55deg));
+
+	/*
+	 * 追加した行と削除した行の左端の + と -。色だけで示さず、文字の形でも見分けられるようにする
+	 * （no-color-only-information）
+	 */
+	--syntax--ins: light-dark(var(--color--green--700), var(--color--green--400));
+	--syntax--del: light-dark(oklch(52% 0.15 25deg), oklch(70% 0.13 25deg));
+
+	/*
+	 * 強調した行の背景。追加した行と削除した行には重ねない。
+	 * 重ねると、ライトで - の比が 4.5:1 を下回る。
+	 * light-dark() を持つ accent--base からではなく、border--base と
+	 * 同じくプリミティブから派生させ、ブラウザごとの解決をそろえる
+	 */
+	--syntax--mark: light-dark(
+		oklch(from var(--color--green--700) l c h / 8%),
+		oklch(from var(--color--green--400) l c h / 8%)
+	);
+}

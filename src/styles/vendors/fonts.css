@@ -1,0 +1,62 @@
+/**
+ * Fontsource のフォントと、端末の Noto Sans JP の @font-face。
+ * Fontsource の CSS（wght.css、400.css）を読み込むと、
+ * 使わない字形の範囲と woff の代替まで入るので、ラテン文字の範囲
+ * （latin）の woff2 だけを、Fontsource の CSS から写して書く。
+ * unicode-range と font-weight は、Fontsource の版を上げたときに
+ * 写し直す。
+ * 和文の Noto Sans JP は Google Fonts から <link> で読み込むので、
+ * ここには端末のフォントを参照する定義だけを書く。
+ *
+ * font-display は役割で決める（font-display-by-role）。
+ * Schibsted Grotesk は題名と本文の欧文に、Fragment Mono はコードと
+ * ページ番号に使い、どちらも読ませる文字なので swap にする。
+ */
+
+@font-face {
+	font-family: 'Schibsted Grotesk Variable';
+	src: url('../../../node_modules/@fontsource-variable/schibsted-grotesk/files/schibsted-grotesk-latin-wght-normal.woff2')
+		format('woff2-variations');
+	unicode-range:
+		U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC,
+		U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+	font-style: normal;
+	font-weight: 400 900;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Fragment Mono';
+	src: url('../../../node_modules/@fontsource/fragment-mono/files/fragment-mono-latin-400-normal.woff2') format('woff2');
+	unicode-range:
+		U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC,
+		U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+}
+
+/*
+ * 端末に入っている Noto Sans JP（local-first-font-face）。
+ * 見つかれば Google Fonts から読み込まずに使い、見つからなければ
+ * この定義は無視され、書体のスタックの次の Noto Sans JP が使われる。
+ * 太字をブラウザの合成にしないよう、400 と 700 を分けて定義する。
+ * 名前は、Google Fonts の Noto Sans JP（Windows など）と、
+ * Noto Sans CJK JP（Android など）の、フルネームと PostScript 名
+ */
+@font-face {
+	font-family: 'Local Noto Sans JP';
+	src:
+		local('Noto Sans JP'), local('Noto Sans JP Regular'), local('NotoSansJP-Regular'),
+		local('Noto Sans CJK JP Regular'), local('NotoSansCJKjp-Regular');
+	font-style: normal;
+	font-weight: 400;
+}
+
+@font-face {
+	font-family: 'Local Noto Sans JP';
+	src:
+		local('Noto Sans JP Bold'), local('NotoSansJP-Bold'), local('Noto Sans CJK JP Bold'), local('NotoSansCJKjp-Bold');
+	font-style: normal;
+	font-weight: 700;
+}

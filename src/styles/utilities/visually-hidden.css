@@ -1,0 +1,28 @@
+/**
+ * 見た目だけを消し、読み上げの対象に残すユーティリティ（hide-by-purpose）。
+ * 1px の箱では環境によって読み上げられないことがあるので、4px の箱にして透明にする。
+ * display と visibility は、コンポーネントが同じ要素を隠していても読み上げに戻すために
+ * 指定し直す。utilities レイヤーで勝つので、!important は付けない
+ * （no-important-for-specificity）。
+ * リンクやボタンに付けると、見えないままフォーカスを受ける。
+ *
+ * @example
+ * <h1 class="_title | -visually-hidden">デッキの題名</h1>
+ */
+.-visually-hidden {
+	position: fixed;
+	inset: 0;
+	contain: strict;
+	display: revert;
+	visibility: unset;
+	inline-size: 4px;
+	block-size: 4px;
+	margin: unset;
+	padding: unset;
+	border: unset;
+	opacity: 0;
+
+	/* 狭い箱の中で折り返すと、語の間の空白を読み落とすスクリーンリーダーがあるため */
+	white-space: nowrap;
+	pointer-events: none;
+}

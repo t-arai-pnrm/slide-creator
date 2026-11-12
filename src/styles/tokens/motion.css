@@ -1,0 +1,17 @@
+/**
+ * イージングと再生時間のトークン（motion-tokens）。値は DESIGN.md の「動き」の表を写す。
+ * 現れる・消える動きは out-quint、画面の上で動かすものは in-out-quint、ホバーで色が変わるような
+ * その場で値が変わるだけの変化は hover（CSS の ease）にする。
+ *
+ * @example
+ * transition-duration: var(--duration--base);
+ * transition-timing-function: var(--ease--out-quint);
+ */
+:root {
+	--ease--hover: ease;
+	--ease--out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+	--ease--in-out-quint: cubic-bezier(0.86, 0, 0.07, 1);
+	--duration--fast: 80ms;
+	--duration--base: 160ms;
+	--duration--slow: 240ms;
+}
