@@ -15,7 +15,9 @@ type Plugin = {
 
 const DECK = /\/slides\/[^/]+\/deck\.mdx$/
 const FENCE = /^\s*(`{3,}|~{3,})/
-const SLIDE = /^<Slide(?=[\s>/])/
+const SLIDE = /^<Slide(?=[\s>/]|$)/
+// 字下げした <Slide は数えないので、番号のないスライドができる。数え漏れに気付けるよう失敗にする
+const INDENTED_SLIDE = /^\s+<Slide(?=[\s>/]|$)/
 
 // <Slide> の行の位置（0 から数える）を返す。e2e のテストも、ここで数えた枚数を期待する値に使う
 const findSlideLines = (lines: readonly string[]): number[] => {
@@ -27,9 +29,35 @@ const findSlideLines = (lines: readonly string[]): number[] => {
 			fence = fence === null ? marker : null
 			return
 		}
-		if (fence === null && SLIDE.test(line)) slideLines.push(index)
+		if (fence !== null) return
+		if (INDENTED_SLIDE.test(line)) throw new Error(`${index + 1} 行目: <Slide は字下げせず、行の先頭に書く`)
+		if (SLIDE.test(line)) slideLines.push(index)
 	})
 	return slideLines
+}
+
+// <Slide の開始タグ（属性を次の行に折り返した場合も含む）のうち、属性の名前の部分だけを返す。
+// 引用符の中と {} の中は値なので外す。値に page= などを書いた原稿を誤って失敗にしないため
+const openingTagNames = (lines: readonly string[], lineIndex: number): string => {
+	const rest = lines.slice(lineIndex).join('\n')
+	let names = ''
+	let quote: string | null = null
+	let depth = 0
+	for (const char of rest) {
+		if (quote !== null) {
+			if (char === quote) quote = null
+		} else if (char === '"' || char === "'" || (depth > 0 && char === '`')) {
+			quote = char
+		} else if (char === '{') {
+			depth += 1
+		} else if (char === '}') {
+			depth = Math.max(0, depth - 1)
+		} else if (depth === 0) {
+			if (char === '>') return names
+			names += char
+		}
+	}
+	throw new Error(`${lineIndex + 1} 行目: <Slide の開始タグが > で閉じていない`)
 }
 
 export const countSlides = (source: string): number => findSlideLines(source.split('\n')).length
@@ -41,7 +69,7 @@ export const addSlideNumbers = (source: string): string => {
 	slideLines.forEach((lineIndex, slideIndex) => {
 		const line = lines[lineIndex] ?? ''
 		// 手で書いた番号と数えた番号が食い違うと、どちらが正しいか分からなくなるので、手で書いた原稿は失敗にする
-		if (/\s(?:page|total)=/.test(line))
+		if (/\s(?:page|total)(?=[\s=/]|$)/.test(openingTagNames(lines, lineIndex)))
 			throw new Error(`${lineIndex + 1} 行目: <Slide> に page と total を書かない（ビルドで足す）`)
 		lines[lineIndex] = line.replace(SLIDE, `<Slide page={${slideIndex + 1}} total={${total}}`)
 	})

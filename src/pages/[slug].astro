@@ -12,10 +12,16 @@ type DeckFrontmatter = { title: string }
 
 export const getStaticPaths = (() => {
 	const decks = import.meta.glob<MDXInstance<DeckFrontmatter>>('/slides/*/deck.mdx', { eager: true })
-	return Object.entries(decks).map(([path, deck]) => ({
-		params: { slug: path.split('/').at(-2) },
-		props: { deck },
-	}))
+	return Object.entries(decks).map(([path, deck]) => {
+		// frontmatter は型のとおりとは限らない。title がないと <title> が空のページになるので、ビルドで止める
+		const title: unknown = deck.frontmatter.title
+		if (typeof title !== 'string' || title.trim() === '')
+			throw new Error(`${path}: frontmatter に title（空でない文字列）を書く`)
+		return {
+			params: { slug: path.split('/').at(-2) },
+			props: { deck },
+		}
+	})
 }) satisfies GetStaticPaths
 
 interface Props {

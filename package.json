@@ -17,9 +17,10 @@
 		"format": "oxfmt",
 		"format:check": "oxfmt --check",
 		"fix": "oxlint --fix && stylelint \"src/**/*.{css,astro}\" --fix && oxfmt",
+		"test:unit": "node --test \"scripts/*.test.ts\"",
 		"test:e2e": "playwright test",
 		"test:html": "markuplint \"dist/**/*.html\"",
-		"test": "pnpm run check && pnpm run lint && pnpm run format:check",
+		"test": "pnpm run check && pnpm run lint && pnpm run format:check && pnpm run test:unit",
 		"verify": "node scripts/verify.ts",
 		"prepare": "lefthook install"
 	},

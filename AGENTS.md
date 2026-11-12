@@ -4,6 +4,15 @@ AI コーディングエージェント向けの規約です。`CLAUDE.md` は�
 
 slide-creator は、記事やマークダウンから登壇用の HTML のスライドを作るツールです。Astro でビルドし、1 つのデッキを 1 つの HTML にします。デッキの原稿は `slides/<slug>/deck.mdx` に書き、`/<slug>/` のページになります。
 
+## スライドの原稿の書き方
+
+`slides/<slug>/deck.mdx` は、frontmatter の `title` と `<Slide>` だけで書く。ビルドの処理が原稿の文字列を読むので、次を守る。
+
+- `<Slide` は字下げせず、行の先頭に書く。ページ番号（`page`）と枚数（`total`）は書かない。ビルドのときに `scripts/vite-plugin-slide-numbers.ts` が数えて足す
+- ノートの `<p slot="notes">` は 1 行で書く。中で改行すると、MDX が中の文を段落として `<p>` で包み、`<p>` の中に `<p>` ができる
+- slug に `index` と `404` は使わない。`dist/` のほかのページと同じ名前になる
+- `{ }` を含むコードは、`export const` で HTML の文字列にし、`<pre set:html={…} />` で渡す（`slides/demo/deck.mdx` が例）
+
 ## コマンド
 
 パッケージマネージャーは pnpm です（`npm` / `npx` は使わない。一度だけ実行するパッケージは `pnpm dlx`）。スクリプトの一覧は `package.json` にあります。ここには、一覧から読み取れない点だけを書きます。

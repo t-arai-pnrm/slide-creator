@@ -56,6 +56,54 @@ const inlineCssUrls = (css: string, from: string) =>
 // <style> の中で </style を書くと、そこで要素が閉じてしまう
 const escapeEnd = (text: string, tag: string) => text.replaceAll(new RegExp(`</${tag}`, 'gi'), `<\\/${tag}`)
 
+// サイトの中を指す URL（/ で始まり // で始まらない）
+const ROOT_URL = String.raw`\/(?!\/)`
+const CSS_ROOT_URL = new RegExp(String.raw`url\(\s*(?:["']|&quot;|&#34;|&#39;)?${ROOT_URL}`)
+const TAG_ROOT_URL = new RegExp(
+	// src は <img> と <source> のほかに、<video>、<audio>、<iframe>、<track>、<embed> にも書ける。poster は <video> の静止画
+	// <a> の href はページの移動で、読み込みではないので対象外
+	String.raw`\b(?:src|poster)="${ROOT_URL}[^"]*"|\bsrcset="(?:[^"]*,)?\s*${ROOT_URL}[^"]*"|^<link\b[^>]*\bhref="${ROOT_URL}[^"]*"`,
+)
+
+/**
+ * 埋め込めずに残った、サイトの中への参照を返す（なければ null）。
+ * 原稿の本文やコードに書いた <img src="/…"> や url(/…) は、文字として &lt; などに直されて出力されるので、
+ * 実際のタグの属性と、<style> の中と style 属性の中だけを調べる
+ */
+export const findLeftover = (html: string): string | null => {
+	const styles: string[] = []
+	// <script> と <style> の中はタグではない。<style> の中だけは CSS として別に調べる。コメントの中は読み込まれない
+	const markup = html
+		.replaceAll(/<!--[\s\S]*?-->/g, '')
+		.replaceAll(/(<script\b[^>]*>)[\s\S]*?<\/script>/gi, '$1')
+		.replaceAll(/(<style\b[^>]*>)([\s\S]*?)<\/style>/gi, (_match, open: string, css: string) => {
+			styles.push(css)
+			return open
+		})
+	for (const css of styles) {
+		const found = CSS_ROOT_URL.exec(css)
+		if (found) return found[0]
+	}
+	for (const [tag] of markup.matchAll(/<[a-z][^\s/>]*(?:\s[^>]*)?>/gi)) {
+		const found = TAG_ROOT_URL.exec(tag)
+		if (found) return found[0]
+		const style = /\bstyle="([^"]*)"/.exec(tag)?.[1]
+		if (style && CSS_ROOT_URL.test(style)) return tag
+	}
+	return null
+}
+
+// dist/<slug>.html が、トップのページ（dist/index.html）や見つからないときのページ（dist/404.html）を上書きしないように
+const RESERVED_SLUGS = new Set(['index', '404'])
+
+export const assertSlug = (slug: string) => {
+	// 大文字と小文字を区別しないファイルシステム（macOS の既定）では、Index.html も index.html を上書きする
+	if (RESERVED_SLUGS.has(slug.toLowerCase()))
+		throw new Error(
+			`slides/${slug}: slug に ${[...RESERVED_SLUGS].join(' と ')} は使えない（dist の別のページを上書きする）`,
+		)
+}
+
 const inlineDeck = (slug: string) => {
 	const pageUrl = `/${slug}/index.html`
 	let html = readFileSync(join(DIST, slug, 'index.html'), 'utf8')
@@ -101,9 +149,8 @@ const inlineDeck = (slug: string) => {
 	)
 
 	// 書き換えの漏れは、ファイル 1 つで開いたときに読み込めないものになるので、ビルドを失敗にする
-	// <a> の href はページの移動で、読み込みではないので対象外
-	const leftover = /\bsrcset?="\/(?!\/)[^"]*"|url\(\s*["']?\/(?!\/)|<link\b[^>]*\bhref="\/(?!\/)[^"]*"/.exec(html)
-	if (leftover) throw new Error(`${slug}: 埋め込めなかった参照がある: ${leftover[0]}`)
+	const leftover = findLeftover(html)
+	if (leftover) throw new Error(`${slug}: 埋め込めなかった参照がある: ${leftover}`)
 
 	const out = join(DIST, `${slug}.html`)
 	writeFileSync(out, html)
@@ -114,8 +161,13 @@ const inlineDeck = (slug: string) => {
 	else console.log(`${out}（${sizeText}）`)
 }
 
-const slugs = readdirSync(SLIDES, { withFileTypes: true })
-	.filter((entry) => entry.isDirectory() && existsSync(join(SLIDES, entry.name, 'deck.mdx')))
-	.map((entry) => entry.name)
+// 単体のテストが判定の関数を import するので、直接実行したときだけ全デッキを処理する
+if (import.meta.main) {
+	const slugs = readdirSync(SLIDES, { withFileTypes: true })
+		.filter((entry) => entry.isDirectory() && existsSync(join(SLIDES, entry.name, 'deck.mdx')))
+		.map((entry) => entry.name)
 
-for (const slug of slugs) inlineDeck(slug)
+	// 1 つでも上書きするデッキがあれば、何も書き出す前に止める
+	for (const slug of slugs) assertSlug(slug)
+	for (const slug of slugs) inlineDeck(slug)
+}
