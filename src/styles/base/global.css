@@ -36,6 +36,18 @@
 	}
 }
 
+/*
+ * フォーカスの輪は、外側の CanvasText と内側の Canvas の 2 本の線で描く
+ * （focus-ring-double）。システムカラーなので、明暗と強制カラーモードの
+ * どれでも、どちらかの線が背景と区別できる。内側の線は box-shadow で描き、
+ * outline-offset で空けた隙間を同じ太さで埋める
+ */
+:focus-visible {
+	box-shadow: 0 0 0 2px Canvas;
+	outline: 2px solid CanvasText;
+	outline-offset: 2px;
+}
+
 /* ルートでカーニングを切っているので、欧文の要素では戻す（kerning-none-on-root） */
 :lang(en) {
 	font-kerning: normal;

@@ -35,5 +35,5 @@
 			}
 		}
 	],
-	"ignorePatterns": ["dist/**", ".astro/**", "public/**", "node_modules/**", "stylelint/**"]
+	"ignorePatterns": ["dist/**", ".astro/**", "public/**", "node_modules/**", "stylelint/**", ".claude/worktrees/**"]
 }

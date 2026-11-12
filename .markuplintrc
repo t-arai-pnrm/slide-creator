@@ -3,5 +3,22 @@
 		".astro$": "@markuplint/astro-parser"
 	},
 	"extends": ["markuplint:recommended"],
-	"overrideMode": "merge"
+	"overrideMode": "merge",
+	"rules": {
+		"performance/head-element-order": {
+			"specConformance": "non-normative",
+			"rules": {
+				"head-element-order": [
+					"meta[charset]",
+					"meta[http-equiv]",
+					"meta[name=\"viewport\"]",
+					"title",
+					{ "selector": "meta", "order": "alphabetical", "attr": "name" },
+					"script",
+					"link",
+					"style"
+				]
+			}
+		}
+	}
 }

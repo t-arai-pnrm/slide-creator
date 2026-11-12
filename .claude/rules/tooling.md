@@ -20,9 +20,11 @@ paths:
 設定は taklog（技術ブログのリポジトリ）から写した。版も taklog と同じにしている。taklog にあってここにないのは、Vitest、knip、GitHub Actions、Dependabot。
 
 - **リンター**: Oxlint（`.oxlintrc.json`）。`.astro` は frontmatter と `<script>` だけが対象。テンプレートの HTML は markuplint（`src/**/*.astro`）、CSS は Stylelint で検査する
+  - `lint:oxlint` は `--disable-nested-config` で動かす。`.claude/worktrees/` の作業用の worktree にも `.oxlintrc.json` があり、`ignorePatterns` で外しても、入れ子の設定として読み込まれ、`options.typeAware` がルートにないというエラーで止まるため
   - 型を使う規則（`no-floating-promises`、`no-unsafe-type-assertion` など）も動かす（`options.typeAware`。検査は `oxlint-tsgolint`）。対象は `.ts` だけで、`.astro` の frontmatter と `<script>` には当たらない。型を `as` で狭めず、型ガードで絞る
   - `.markuplintrc` の `overrideMode: "merge"` は外さない。既定の `reset` では、`overrides` に当たるファイルに推奨のルールが当たらず、何も検査されない
   - markuplint のルールを外すときは、理由をこの文書に書く（`.markuplintrc` は JSON でコメントを書けないため）
+  - `head-element-order` の順は、既定（`link`、`style`、`script`）から、`script` を `link` と `style` より前に変えている。`astro.config.mjs` の `inlineStylesheets: 'always'` で、Astro は CSS を `<style>` にして `<head>` の末尾に入れるので、`<head>` に書いた `<script>` が必ずその前に来るため。`<head>` の `<script>` は描く前にテーマを読み戻すもので（`src/layouts/Deck.astro`）、`<link rel="stylesheet">` より前なら Google Fonts の CSS を待たずに動く。推奨の設定の中の名前付きのルール（`performance/head-element-order`）ごと書き換える。`head-element-order` だけを書いても、推奨の設定の既定の順が残る
   - Stylelint の設定と `stylelint/` の独自ルールは、CSS のガイドラインのリポジトリのものを写している。ガイドラインが変わったら合わせて変える
 - **フォーマッター**: Oxfmt（`.oxfmtrc.jsonc`）。`.md` と `.mdx` はすべて整形しない（スライドの原稿、AGENTS.md を含む）
 - **TypeScript**: 6 系。TypeScript 7 は `astro check` が未対応のため使わない

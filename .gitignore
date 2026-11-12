@@ -23,3 +23,6 @@ pnpm-debug.log*
 # Claude Code の作業用のファイル（CSS のガイドラインのチェック表、検証の記録とレビューの判定）
 .claude/recss-checklists/
 .claude/logs/
+
+# 作業用の git worktree
+.claude/worktrees/

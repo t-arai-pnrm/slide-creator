@@ -2,6 +2,8 @@
 /**
  * 1 枚のスライド。16:9 の枠（._frame）と、その下のスピーカーノート（._notes）からなる。
  * ノートの出し分け（縦長の画面で出し、横長の画面で隠す）は CSS で行う。
+ * 発表の表示でノートを出したとき（下の 3 割をノートの領域にする）と、発表者ビュー（枠とノートをデッキのグリッドに置く）の
+ * 見た目は、デッキのルートの data-view と data-notes を祖先の状態として読み、この中に書く。
  * ノートの slot を渡さないスライドでは、空の領域と中身のないランドマークを出さないよう、._notes を出力しない。
  */
 interface Props {
@@ -11,9 +13,14 @@ interface Props {
 	total: number
 	/** 章のラベル。枠線の左上の角に、題名の上に置く */
 	chapter?: string | undefined
+	/**
+	 * レイアウト。cover は表紙、section は章の扉、statement は主張（題名をキーメッセージとして大きく出す）、
+	 * quote は引用、number は数値、end は最後。図解、コード、比較、画像、出典は指定せず、本文に置く部品で決まる
+	 */
+	layout?: 'cover' | 'section' | 'statement' | 'quote' | 'number' | 'end' | undefined
 }
 
-const { page, total, chapter } = Astro.props
+const { page, total, chapter, layout } = Astro.props
 
 // section を題名で名前付けする（aria-labelledby）には、題名の要素に id が要る。
 // 原稿の側で id を書かせると付け忘れや重なりが起きるので、題名は名前付きの slot で受け、h2 はこのコンポーネントが出す
@@ -22,9 +29,12 @@ const titleId = `slide-${page}-title`
 const hasNotes = Astro.slots.has('notes')
 // すべてのスライドのノートが同じ名前だと、ランドマークの一覧で区別できないので、ページ番号を名前に含める
 const notesLabel = `スピーカーノート（${page} / ${total}）`
+// ノートの aside には tabindex="0" を付ける。発表の表示と発表者ビューでは長いノートを領域の中でスクロールさせ、
+// スクロールする領域をキーボードで選べないブラウザ（Safari）でも読めるようにするため。
+// 名前のあるランドマークなので、フォーカスしたときに名前が読まれる
 ---
 
-<section class="slide" aria-labelledby={titleId}>
+<section class="slide" aria-labelledby={titleId} data-layout={layout}>
 	<div class="_frame">
 		<div class="_frame-inner">
 			<hgroup class="_heading">
@@ -37,26 +47,79 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			<p class="_page">{page} / {total}</p>
 		</div>
 	</div>
-	{hasNotes && <aside class="_notes" aria-label={notesLabel}><slot name="notes" /></aside>}
+	{hasNotes && <aside class="_notes" aria-label={notesLabel} tabindex="0"><slot name="notes" /></aside>}
 </section>
 
 <style>
 	@layer components {
+		/*
+		 * 発表の表示と発表者ビューは、デッキのルート（Deck.astro の .deck）の data-view と data-notes で決まる。
+		 * その状態で変わるこのコンポーネントの見た目は、祖先の状態として :global() で読み、このファイルに書く
+		 * （is-for-ancestor-context）。デッキの CSS からは、このコンポーネントのルートの配置だけを決める
+		 */
 		.slide {
-			/* DESIGN.md の「枠」のとおり、枠を画面の中央に置く */
+			/* 発表の表示でノートを出したとき、画面の下の 3 割をノートの領域にする（DESIGN.md の「枠」） */
+			--_notes-share: 0.3;
+
+			/* 枠を収める高さ。ふだんは画面の高さで、ノートの領域を取ったときはその残り */
+			--_stage-block-size: 100svb;
+
+			/* スライドが替わったときに要素を順に出す間隔（DESIGN.md の「動かしてよい場面」） */
+			--_stagger: var(--duration--stagger);
+
+			/*
+			 * 上の残りの高さに枠を、下にノートの領域を置く。枠は上の領域の中で上下の中央に置く。
+			 * 隠したスライドは kiso.css の [hidden] の display: none !important が、この display より勝つ
+			 */
+			&:is(:global(.deck[data-view='present'][data-notes='shown']) > *) {
+				--_stage-block-size: calc(100svb * (1 - var(--_notes-share)));
+
+				display: block grid;
+				reading-flow: grid-rows;
+				grid-template:
+					'--frame' 1fr
+					'--notes' calc(100svb * var(--_notes-share))
+					/ 1fr;
+				align-items: center;
+				min-block-size: 100svb;
+			}
+
+			/*
+			 * 発表者ビューの今のスライドは、デッキのグリッドの全体に置かれる。
+			 * 枠とノートを、デッキの --frame と --notes のエリアに置くため、行と列をデッキから受け継ぐ
+			 */
+			&:is(:global(.deck[data-view='presenter']) > *)[data-slide='current'] {
+				display: block grid;
+				grid-template: subgrid / subgrid;
+			}
+
+			/* DESIGN.md の「枠」のとおり、枠を中央に置く */
 			& > ._frame {
+				grid-area: --frame;
 				margin-inline: auto;
+			}
+
+			/* 上で枠を上下の中央に置く align-items: center を、ノートの領域には当てず、領域の高さいっぱいに広げる */
+			& > ._notes {
+				grid-area: --notes;
+				align-self: stretch;
 			}
 		}
 
 		.slide + .slide {
-			/* 枠の面と枠の外が同じ色なので、線がないとスライドの境目が見えない */
-			@media screen {
-				border-block-start: 1px solid var(--border--base);
-			}
-
 			@media print {
 				break-before: page;
+			}
+
+			/*
+			 * 枠の面と枠の外が同じ色なので、線がないとスライドの境目が見えない。
+			 * 発表の表示と発表者ビューでは、hidden で隠したスライドも兄弟に数えるので、
+			 * 縦に並べる形（data-view がない）に限る
+			 */
+			&:is(:global(.deck:not([data-view])) > *) {
+				@media screen {
+					border-block-start: 1px solid var(--border--base);
+				}
 			}
 		}
 
@@ -75,12 +138,41 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			display: block grid;
 
 			/*
+			 * 発表の表示でノートを出したときと発表者ビューでは、枠はグリッドのアイテムになる。
+			 * グリッドのアイテムは、中央に寄せる margin-inline: auto で中身の幅に縮み、
+			 * 中身の幅を持たないコンテナは幅が 0 になるので、親の幅いっぱいに広げてから上限で抑える
+			 * （no-container-on-intrinsic-size、stretch-over-width-100）
+			 */
+			inline-size: -webkit-fill-available;
+			inline-size: stretch;
+
+			/*
+			 * aspect-ratio を持つ箱は、中身が高さを超えると、自動の最小の大きさ（min-block-size: auto）で縦に伸びる。
+			 * 枠は中身にかかわらず 16:9 に保つので、最小の大きさを 0 にする。
+			 * 収まらない中身は枠を伸ばさず、本文の領域からあふれさせる（下の ._body）
+			 */
+			min-block-size: 0;
+
+			/*
 			 * 画面の幅は、幅が auto のブロックが親の幅を超えないことで受け持つ。
 			 * ここでは画面の高さから決まる上限だけを書く（viewport-units-as-last-resort）
 			 */
-			max-inline-size: calc(100svb * var(--_ratio));
+			max-inline-size: calc(var(--_stage-block-size) * var(--_ratio));
 			aspect-ratio: var(--_ratio);
 			background-color: var(--background--base);
+
+			/* 発表者ビューの次のスライドは、隣の今のスライドと面の色が同じなので、線で区切る */
+			&:is(.slide[data-slide='next'] > *) {
+				border: 1px solid var(--border--base);
+			}
+
+			& > ._frame-inner {
+				/*
+				 * 枠のグリッドの行は、この要素の中身の高さを最小の大きさとして伸び、枠の下へはみ出す。
+				 * 枠の高さに収め、ページ番号を枠線の右下の角に保つ（収まらない中身は ._body からあふれる）
+				 */
+				min-block-size: 0;
+			}
 		}
 
 		/*
@@ -99,12 +191,41 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			padding-block: var(--guide--block);
 			padding-inline: var(--guide--inline);
 
+			/* 表紙、章の扉、最後は、題名を枠の下寄りに置き、上を空ける */
+			&:is(.slide:is([data-layout='cover'], [data-layout='section'], [data-layout='end']) *) {
+				reading-flow: grid-rows;
+				grid-template:
+					'.' 1fr
+					'--heading' auto
+					'--body' auto
+					'--page' auto
+					/ 1fr;
+			}
+
+			/* 主張は、キーメッセージを枠の中ほどに置き、補足を下に小さく添える */
+			&:is(.slide[data-layout='statement'] *) {
+				reading-flow: grid-rows;
+				grid-template:
+					'.' 1fr
+					'--heading' auto
+					'--body' auto
+					'.' 1fr
+					'--page' auto
+					/ 1fr;
+			}
+
 			& > ._heading {
 				grid-area: --heading;
 			}
 
 			& > ._body {
 				grid-area: --body;
+
+				/*
+				 * 本文の行（1fr）は、中身の高さを最小の大きさとして伸び、ページ番号を枠線の外へ押し出す。
+				 * 本文の領域を残りの高さに収め、収まらない中身はこの中からあふれさせて、ページ番号の位置を保つ
+				 */
+				min-block-size: 0;
 			}
 
 			& > ._page {
@@ -114,13 +235,81 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 		}
 
 		._heading {
+			/*
+			 * 発表の表示でスライドが替わったら、題名、題名の下の線、本文の要素の順に出す（DESIGN.md の「動かしてよい場面」）。
+			 * 隠したスライドは display: none なので、表示に戻るたびにアニメーションが最初から再生される。
+			 * そのため、スクリプトで始め直す処理は要らない。
+			 * 縦に並べて読む形と、発表者ビューの次のスライドは動かさない。
+			 * 移動は動きを減らす設定では外し、不透明度の変化だけを残す（motion-only-with-no-preference）
+			 */
+			&:is(:global(.deck[data-view='present']) > .slide[data-slide='current'] *) {
+				--translate-from--y-value: var(--distance--enter);
+
+				animation-name: --fade-in;
+				animation-duration: var(--duration--slow);
+				animation-timing-function: var(--ease--out-quint);
+				animation-fill-mode: both;
+
+				@media (prefers-reduced-motion: no-preference) {
+					animation-name: --fade-in, --translate-from;
+				}
+			}
+
+			/*
+			 * 表紙と最後は、題名の上にアクセントの太い線を引く。アクセントはこの 1 か所だけにする。
+			 * 題名の幅の上限は、DESIGN.md の「レイアウトの一覧」の、レイアウトごとの幅の上限
+			 */
+			&:is(.slide:is([data-layout='cover'], [data-layout='end']) *) {
+				max-inline-size: 75cqi;
+				padding-block-start: var(--spacing--md);
+				border-block-start: var(--line-width--thick) solid var(--accent--base);
+			}
+
+			/*
+			 * ふつうのスライドは、題名の下に細い線を引いて、本文と分ける。
+			 * 切り替えのときに左から伸ばす（下のアニメーション）ため、枠線ではなく疑似要素で描く。
+			 * 強制カラーモードでも見えるよう、面ではなく線で描く
+			 */
+			&:is(
+					.slide:is(:not([data-layout]), [data-layout='quote'], [data-layout='number'], [data-layout='section']) *
+				)::after {
+				content: '';
+				display: block flow;
+				margin-block-start: var(--spacing--sm);
+				border-block-start: var(--line-width--thin) solid var(--border--strong);
+			}
+
+			/* 章の扉は、題名の下に太い線を引く。上の指定より後に書いて勝たせる */
+			&:is(.slide[data-layout='section'] *)::after {
+				border-block-start-width: var(--line-width--thick);
+			}
+
+			/*
+			 * 題名の下の線は、題名の後に左から伸ばす。伸びる動きなので、動きを減らす設定では動かさない
+			 * （motion-only-with-no-preference）。transform-origin には論理方向の値がないので、
+			 * 物理方向の left で書く（physical-only-where-no-logical）
+			 */
+			&:is(:global(.deck[data-view='present']) > .slide[data-slide='current'] *)::after {
+				@media (prefers-reduced-motion: no-preference) {
+					--scale-from--x-value: 0;
+
+					transform-origin: left;
+					animation-name: --scale-from;
+					animation-duration: var(--duration--slow);
+					animation-timing-function: var(--ease--out-quint);
+					animation-delay: var(--_stagger);
+					animation-fill-mode: both;
+				}
+			}
+
 			& > ._chapter + ._title {
 				margin-block-start: var(--spacing--xs);
 			}
 		}
 
+		/* 章のラベルの文字は、taklog の記事の分類のラベルに合わせてアクセントの色にする（DESIGN.md の「アクセントの使い方」） */
 		._chapter {
-			color: var(--foreground--muted);
+			color: var(--accent--base);
 			font-family: var(--text--label--font-family);
 			font-size: var(--text--label--font-size);
 			font-weight: var(--text--label--font-weight);
@@ -141,6 +330,17 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			font-size: var(--text--title--font-size);
 			font-weight: var(--text--title--font-weight);
 			line-height: var(--text--title--leading);
+
+			/* 題名が 2 行になったとき、後ろの行に数文字だけ残らないよう、行の長さをそろえる */
+			text-wrap: balance;
+
+			/* 表紙、章の扉、主張は display のスタイルにする（DESIGN.md の「レイアウトの一覧」） */
+			&:is(
+				.slide:is([data-layout='cover'], [data-layout='section'], [data-layout='statement'], [data-layout='end']) *
+			) {
+				font-size: var(--text--display--font-size);
+				line-height: var(--text--display--leading);
+			}
 		}
 
 		._body {
@@ -149,9 +349,41 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			font-weight: var(--text--body--font-weight);
 			line-height: var(--text--body--leading);
 
+			/* 表紙と最後の発表者の名前は、本文の下に、枠線の右下の角に寄せず左端にそろえる */
+			&:is(.slide:is([data-layout='cover'], [data-layout='end']) *) {
+				margin-block-start: var(--spacing--sm);
+			}
+
+			/* 数値は、数字を本文の領域の下寄りに大きく置く */
+			&:is(.slide[data-layout='number'] *) {
+				align-self: end;
+			}
+
+			/* 主張の補足の幅の上限は、DESIGN.md の「レイアウトの一覧」の、レイアウトごとの幅の上限 */
+			&:is(.slide[data-layout='statement'] *) {
+				max-inline-size: 70cqi;
+			}
+
 			/* 本文は原稿のスロットから入り、クラスを付けられないので、直下の子を選ぶ */
 			& > :global(* + *) {
 				margin-block-start: var(--spacing--sm);
+			}
+		}
+
+		/* 本文の要素は、題名の 1 つ後に出す（._heading の動きと同じ条件） */
+		._body > :global(*) {
+			&:is(:global(.deck[data-view='present']) > .slide[data-slide='current'] *) {
+				--translate-from--y-value: var(--distance--enter);
+
+				animation-name: --fade-in;
+				animation-duration: var(--duration--slow);
+				animation-timing-function: var(--ease--out-quint);
+				animation-delay: var(--_stagger);
+				animation-fill-mode: both;
+
+				@media (prefers-reduced-motion: no-preference) {
+					animation-name: --fade-in, --translate-from;
+				}
 			}
 		}
 
@@ -186,6 +418,34 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			line-height: var(--text--notes--leading);
 
 			@media print, (aspect-ratio >= 1) {
+				display: none;
+			}
+
+			/*
+			 * ノートの領域は画面の端に接するので、外側に描く既定のフォーカスの輪は画面の外に出て見えない。
+			 * 同じ 2 本の線（外側 CanvasText、内側 Canvas、それぞれ 2px）を、要素の内側に寄せて描く
+			 */
+			&:focus-visible {
+				box-shadow: inset 0 0 0 calc(2 * 2px) Canvas;
+				outline-offset: -2px;
+			}
+
+			/*
+			 * 発表の表示でノートを出したときと発表者ビューでは、画面の向きにかかわらず出す。
+			 * 枠の下か横に別の領域として置くので、面と上の辺の線で枠と区切る。
+			 * 下の 3 割の領域に収まらない長さのノートは、領域の中でスクロールさせる
+			 */
+			&:is(:global(.deck[data-notes='shown']) *) {
+				@media screen {
+					display: block flow;
+					overflow-y: auto;
+					border-block-start: 1px solid var(--border--base);
+					background-color: var(--background--surface);
+				}
+			}
+
+			/* 発表者ビューの次のスライドは、枠だけを見せる。上の指定より後に書いて勝たせる */
+			&:is(.slide[data-slide='next'] *) {
 				display: none;
 			}
 		}

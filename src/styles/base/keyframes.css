@@ -1,0 +1,23 @@
+/**
+ * 全体で使う @keyframes。1 つにつき 1 つのプロパティだけを変え、
+ * 複数の動きは使う側で animation-name に並べる（keyframes-single-property）。
+ * to を省き、要素がもともと持っている値に向けて動かす（keyframes-omit-obvious-frame）。
+ * 起点は、使う側から --<名前>--<値の名前> で渡す（keyframes-api-properties）。
+ */
+@keyframes --fade-in {
+	from {
+		opacity: var(--fade-in--from-value, 0);
+	}
+}
+
+@keyframes --translate-from {
+	from {
+		translate: var(--translate-from--x-value, 0) var(--translate-from--y-value, 0);
+	}
+}
+
+@keyframes --scale-from {
+	from {
+		scale: var(--scale-from--x-value, 1) var(--scale-from--y-value, 1);
+	}
+}

@@ -16,5 +16,7 @@
 @import url('./tokens/motion.css') layer(tokens);
 @import url('kiso.css') layer(reset);
 @import url('./base/global.css') layer(base);
+@import url('./base/keyframes.css') layer(base);
 @import url('./vendors/fonts.css') layer(vendors);
+@import url('./patterns/slide-parts.css') layer(patterns);
 @import url('./utilities/visually-hidden.css') layer(utilities);
