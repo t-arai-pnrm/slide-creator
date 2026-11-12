@@ -1,0 +1,17 @@
+{
+	"version": "0.0.1",
+	"configurations": [
+		{
+			"name": "slide-creator-dev",
+			"runtimeExecutable": "pnpm",
+			"runtimeArgs": ["exec", "astro", "dev", "--port", "4350"],
+			"port": 4350
+		},
+		{
+			"name": "slide-creator-preview",
+			"runtimeExecutable": "pnpm",
+			"runtimeArgs": ["exec", "astro", "preview", "--port", "4360"],
+			"port": 4360
+		}
+	]
+}

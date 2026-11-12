@@ -1,0 +1,30 @@
+{
+	"$schema": "./node_modules/oxfmt/configuration_schema.json",
+	"printWidth": 120,
+	"useTabs": true,
+	"tabWidth": 2,
+	"semi": false,
+	"singleQuote": true,
+	"arrowParens": "always",
+	"astro": {
+		// astro.config.mjs の compressHTML: true（HTML と同じ空白の扱い）に合わせる
+		"compressHTML": "html",
+	},
+	"ignorePatterns": [
+		"dist/**",
+		".astro/**",
+		"public/**",
+		"pnpm-lock.yaml",
+		// スキルを入れる CLI（skills）が書き出すファイル。入れ直すたびに CLI の書式に戻るので整形しない
+		"skills-lock.json",
+		// スライドの原稿と文書は整形しない
+		"*.md",
+		"*.mdx",
+		// RECSSガイドラインのリポジトリから写した独自ルール。差分を取りやすいよう原文のまま保つ
+		"stylelint/**",
+		// 外から写したスキル。写し直したときに差分を取りやすいよう原文のまま保つ
+		".claude/skills/**",
+		// Claude Code が書き換える個人の設定。Git の管理外なので、手元の整形チェックだけを止めないよう外す
+		".claude/settings.local.json",
+	],
+}

@@ -1,0 +1,2 @@
+# 改行を LF にそろえる。.editorconfig はエディタでの編集にしか効かないので、Git の側でも直す
+* text=auto eol=lf

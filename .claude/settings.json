@@ -1,0 +1,13 @@
+{
+	"enabledPlugins": {
+		"recss-guideline@recss-guideline": true
+	},
+	"extraKnownMarketplaces": {
+		"recss-guideline": {
+			"source": {
+				"source": "github",
+				"repo": "t-arai-pnrm/recss-guideline"
+			}
+		}
+	}
+}

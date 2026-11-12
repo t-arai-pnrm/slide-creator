@@ -1,0 +1,33 @@
+{
+	"editor.defaultFormatter": "oxc.oxc-vscode",
+	"editor.formatOnSave": true,
+	"editor.formatOnPaste": true,
+	"editor.codeActionsOnSave": {
+		"source.addMissingImports": "explicit",
+		"source.fixAll.oxc": "explicit",
+		"source.fixAll.stylelint": "explicit",
+		"source.organizeImports": "never"
+	},
+	"javascript.preferences.importModuleSpecifier": "non-relative",
+	"typescript.preferences.importModuleSpecifier": "non-relative",
+	"typescript.tsdk": "node_modules/typescript/lib",
+	"css.validate": false,
+	"stylelint.validate": ["css", "astro"],
+	"emmet.includeLanguages": {
+		"astro": "html",
+		"mdx": "javascriptreact"
+	},
+	"editor.quickSuggestions": {
+		"strings": "on"
+	},
+	"editor.wordWrap": "on",
+	"files.associations": {
+		"*.mdx": "markdown"
+	},
+	"cssVariables.lookupFiles": ["**/*.css", "**/*.ts"],
+	"files.trimTrailingWhitespace": true,
+	// Markdown の行末の空白 2 つは改行になるので消さない（.editorconfig と同じ。*.mdx も markdown として開く）
+	"[markdown]": {
+		"files.trimTrailingWhitespace": false
+	}
+}

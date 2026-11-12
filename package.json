@@ -1,0 +1,60 @@
+{
+	"name": "slide-creator",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "astro dev",
+		"build": "astro check && astro build",
+		"preview": "astro preview",
+		"astro": "astro",
+		"check": "astro check",
+		"lint": "pnpm run --parallel --aggregate-output \"/^lint:/\"",
+		"lint:oxlint": "oxlint --deny-warnings",
+		"lint:stylelint": "stylelint \"src/**/*.{css,astro}\" --max-warnings=0",
+		"lint:markuplint": "markuplint \"src/**/*.astro\"",
+		"format": "oxfmt",
+		"format:check": "oxfmt --check",
+		"fix": "oxlint --fix && stylelint \"src/**/*.{css,astro}\" --fix && oxfmt",
+		"test:e2e": "playwright test",
+		"test:html": "markuplint \"dist/**/*.html\"",
+		"test": "pnpm run check && pnpm run lint && pnpm run format:check",
+		"verify": "node scripts/verify.ts",
+		"prepare": "lefthook install"
+	},
+	"dependencies": {
+		"astro": "7.4.5"
+	},
+	"devDependencies": {
+		"@astrojs/check": "0.9.12",
+		"@astrojs/compiler-rs": "0.5.2",
+		"@markuplint/astro-parser": "5.4.0",
+		"@playwright/test": "1.64.1",
+		"@types/node": "24.19.2",
+		"lefthook": "2.2.2",
+		"markuplint": "5.4.0",
+		"oxfmt": "0.75.0",
+		"oxlint": "1.90.0",
+		"oxlint-tsgolint": "7.0.2005",
+		"postcss-html": "2.0.0",
+		"postcss-selector-parser": "7.1.7",
+		"stylelint": "17.16.0",
+		"stylelint-config-standard": "40.0.0",
+		"stylelint-order": "8.1.2",
+		"stylelint-plugin-display-multi-keyword-syntax": "0.1.1",
+		"stylelint-plugin-logical-css": "2.1.0",
+		"taks-stylelint-order": "1.1.3",
+		"typescript": "6.0.3"
+	},
+	"devEngines": {
+		"runtime": {
+			"name": "node",
+			"version": "^24.22.2",
+			"onFail": "download"
+		}
+	},
+	"engines": {
+		"node": "24.x"
+	},
+	"packageManager": "pnpm@11.28.9"
+}

@@ -1,0 +1,39 @@
+{
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+	"plugins": ["eslint", "typescript", "unicorn", "import", "oxc"],
+	// 型を使う規則（no-floating-promises など）も動かす。検査は oxlint-tsgolint が行い、.astro の frontmatter と <script> は対象外
+	"options": {
+		"typeAware": true
+	},
+	"env": {
+		"browser": true,
+		"node": true,
+		"astro": true,
+		"es2024": true
+	},
+	"categories": {
+		"correctness": "error",
+		"suspicious": "warn",
+		"perf": "warn"
+	},
+	"rules": {
+		"typescript/consistent-type-imports": "error",
+		"import/no-duplicates": "error",
+		"eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+		// CSS は副作用だけを目的に import する
+		"import/no-unassigned-import": "off",
+		// 関数の置き場所は読みやすさで決める。性能差が問題になる規模ではない
+		"unicorn/consistent-function-scoping": "off"
+	},
+	"overrides": [
+		{
+			// 型定義ファイルは外部の API の形をそのまま書く
+			"files": ["**/*.d.ts"],
+			"rules": {
+				"typescript/triple-slash-reference": "off",
+				"typescript/no-extraneous-class": "off"
+			}
+		}
+	],
+	"ignorePatterns": ["dist/**", ".astro/**", "public/**", "node_modules/**", "stylelint/**"]
+}

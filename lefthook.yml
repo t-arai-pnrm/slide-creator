@@ -1,0 +1,48 @@
+# Git hooks（https://lefthook.dev/）
+glob_matcher: doublestar
+
+pre-commit:
+  # 修正と整形が同じファイルを同時に書き換えないよう、順番に実行する
+  piped: true
+  jobs:
+    - name: oxlint
+      glob: '**/*.{astro,ts,tsx,js,mjs,cjs}'
+      run: pnpm exec oxlint --fix --deny-warnings {staged_files}
+      stage_fixed: true
+    - name: stylelint
+      glob: 'src/**/*.{css,astro}'
+      run: pnpm exec stylelint --fix --max-warnings=0 {staged_files}
+      stage_fixed: true
+    - name: markuplint
+      glob: 'src/**/*.astro'
+      run: pnpm exec markuplint {staged_files}
+    - name: oxfmt
+      glob: '**/*.{astro,ts,tsx,js,mjs,cjs,json,jsonc,yml,yaml,css}'
+      # Oxfmt は渡したファイルがすべて ignorePatterns に当たると終了コード 2 で失敗するので、
+      # .oxfmtrc.jsonc の ignorePatterns のうち glob に当たるものをここでも外す
+      exclude:
+        - 'dist/**'
+        - '.astro/**'
+        - 'public/**'
+        - 'pnpm-lock.yaml'
+        - 'skills-lock.json'
+        - 'stylelint/**'
+        - '.claude/skills/**'
+      run: pnpm exec oxfmt {staged_files}
+      stage_fixed: true
+
+commit-msg:
+  jobs:
+    - name: conventional-commits
+      run: |
+        # git merge / revert / commit --fixup が作るメッセージは通す
+        head -n 1 {1} | grep -Eq '^(Merge |Revert "|fixup! |squash! |amend! )' && exit 0
+        head -n 1 {1} | grep -Eq '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?!?: .+' || {
+          echo "コミットメッセージの 1 行目は Conventional Commits の形式にしてください（例: feat: 比較のレイアウトを足す）"
+          exit 1
+        }
+
+pre-push:
+  jobs:
+    - name: test
+      run: pnpm run test
