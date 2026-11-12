@@ -14,7 +14,11 @@ slide-creator は、記事やマークダウンから登壇用の HTML のスラ
 
 ## 作業ごとの文書
 
-作業に当たる文書を読んでから手を付ける。文書は `.claude/rules/` にあり、Claude Code は当たるファイルを触ったときに読み込む（frontmatter の `paths`）。
+作業に当たる文書を読んでから手を付ける。
+
+- [DESIGN.md](DESIGN.md): 色、文字、余白、角丸、動き、レイアウトの値と使い方。スライドの見た目を決めるとき、CSS を書くとき、スライドの原稿を書くとき
+
+ほかの文書は `.claude/rules/` にあり、Claude Code は当たるファイルを触ったときに読み込む（frontmatter の `paths`）。
 
 - [ツール](.claude/rules/tooling.md): リンター、フォーマッター、TypeScript、テスト、Git hooks、依存の安全性。設定を変えるときと、テストを書くとき
 - [CSS](.claude/rules/css.md): CSS を書くとき（Astro の `<style>` を含む）
