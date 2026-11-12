@@ -7,6 +7,11 @@ pre-commit:
   jobs:
     - name: oxlint
       glob: '**/*.{astro,ts,tsx,js,mjs,cjs}'
+      # Oxlint は渡したファイルがすべて ignorePatterns に当たると「No files found to lint」で失敗するので、
+      # .oxlintrc.json の ignorePatterns のうち、コミットされうるものをここでも外す
+      exclude:
+        - 'public/**'
+        - 'stylelint/**'
       run: pnpm exec oxlint --fix --deny-warnings {staged_files}
       stage_fixed: true
     - name: stylelint

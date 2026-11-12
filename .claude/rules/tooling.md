@@ -7,6 +7,8 @@ paths:
   - ".oxfmtrc.jsonc"
   - ".markuplintrc"
   - "stylelint.config.mjs"
+  - "stylelint/**"
+  - "astro.config.mjs"
   - "lefthook.yml"
   - "playwright.config.ts"
   - "e2e/**"

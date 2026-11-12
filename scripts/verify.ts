@@ -30,7 +30,9 @@ const isClean = (): boolean => git('status', '--porcelain') === ''
 
 const root = git('rev-parse', '--show-toplevel')
 // rev-parse --abbrev-ref HEAD はコミットがないと失敗するので、HEAD が指すブランチの名前を読む
-const branch = git('symbolic-ref', '--short', 'HEAD')
+// detached HEAD では --quiet の symbolic-ref が終了コード 1 で終わる。そのときは rev-parse --abbrev-ref と同じく HEAD と書く
+const symbolicRef = run('symbolic-ref', '--quiet', '--short', 'HEAD')
+const branch = symbolicRef.status === 1 ? 'HEAD' : git('symbolic-ref', '--short', 'HEAD')
 const commit = head()
 const cleanBefore = commit !== null && isClean()
 if (commit === null)
