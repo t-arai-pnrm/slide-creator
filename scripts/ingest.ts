@@ -3,7 +3,8 @@
  * 要約はしない。スライドの素材を選ぶのは、後の手順の読む係と人の仕事のため
  *
  * 使い方: node scripts/ingest.ts <URL かファイルのパス> [--slug <名前>] [--force]
- * 終了コード: 0 は成功、1 は失敗、2 は同じ slug のフォルダーがすでにある（--force で作り直すか、--slug で別の名前にする）
+ * 終了コード: 0 は成功、1 は失敗、2 は同じ slug のフォルダーがすでにある（--force で作り直すか、--slug で別の名前にする）、
+ * 3 は slug がビルドで使えない名前（index と 404）になった（--slug で別の名前にする）
  */
 // 画像は 1 枚ずつ順に取る。番号を記事の中の順に付けるのと、記事のサーバーに同時に何本も要求を送らないため
 /* oxlint-disable no-await-in-loop */
@@ -13,9 +14,11 @@ import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 
+import { assertSlug } from './inline-decks.ts'
 import { findContentRoot, htmlToMarkdown, parseHtml, readMeta } from './ingest/html.ts'
 
 export class SlugExistsError extends Error {}
+export class ReservedSlugError extends Error {}
 
 export const sanitizeSlug = (text: string): string =>
 	text
@@ -109,6 +112,14 @@ export const ingest = async (options: Options): Promise<Result> => {
 	const isUrl = /^https?:\/\//.test(input)
 	const slug = options.slug ?? slugFromInput(input)
 	if (slug === '') throw new Error('slug を作れませんでした。--slug で名前を指定してください')
+	// 使えない slug は、取り込んでもビルドで止まる。規則をビルドとそろえるため、判定は inline-decks.ts のものを使う
+	try {
+		assertSlug(slug)
+	} catch (error) {
+		throw new ReservedSlugError(
+			`${error instanceof Error ? error.message : String(error)}。--slug で別の名前を指定してください`,
+		)
+	}
 	const dir = join(slidesDir, slug)
 	const exists = await stat(dir).then(
 		() => true,
@@ -213,6 +224,6 @@ if (import.meta.main) {
 		for (const failed of result.failedImages) console.warn(`画像を取れませんでした: ${failed}`)
 	} catch (error) {
 		console.error(error instanceof Error ? error.message : error)
-		process.exitCode = error instanceof SlugExistsError ? 2 : 1
+		process.exitCode = error instanceof SlugExistsError ? 2 : error instanceof ReservedSlugError ? 3 : 1
 	}
 }

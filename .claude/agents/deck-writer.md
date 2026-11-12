@@ -18,7 +18,8 @@ tools: Read, Write, Edit, Bash
 ## 書く前に読むもの
 
 - DESIGN.md の「概要」「レイアウトの一覧」「1 枚に入れてよい量」「すること・しないこと」
-- `src/pages/index.astro`（原稿の形の手本）
+- AGENTS.md の「スライドの原稿の書き方」
+- `slides/sample/deck.mdx` と `slides/demo/deck.mdx`（原稿の形の手本）
 
 ## 原稿の決まり
 
@@ -32,7 +33,16 @@ tools: Read, Write, Edit, Bash
 
 ## 原稿の形
 
-原稿の書き方（MDX）は、テーマの作業で決めている最中です。いまは `src/pages/index.astro` に倣い、`<Slide>` の中に `<Fragment slot="title">` で題名、`<p slot="notes">` でノートを書きます。レイアウトを指定する方法はまだないので、各スライドの前に `{/* レイアウト: 図解 */}` のコメントで、構成案のレイアウトを残します。
+frontmatter に `title` を書き、`<Slide>` の中に `<Fragment slot="title">` で題名、`<p slot="notes">` でノートを書きます。`<Slide` は字下げせずに行の先頭に書き、`page` と `total` は書きません（ビルドで足す）。ノートの `<p>` は 1 行で書きます。
+
+構成案のレイアウトは、`<Slide>` の `layout` で指定します。
+
+| レイアウト | 指定 |
+| --- | --- |
+| 表紙、章の扉、主張、引用、数値、最後 | `layout="cover"`、`"section"`、`"statement"`、`"quote"`、`"number"`、`"end"` |
+| 図解、コード、比較、画像、出典 | `layout` を書かず、本文に定型の図、コードブロック、画像、出典の一覧を置く（クラスは手本のとおり） |
+
+`{ }` を含むコードは、手本の `slides/demo/deck.mdx` のように `export const` で HTML の文字列にし、`<pre class="code-block" set:html={…} />` で渡します。
 
 ## 手順
 

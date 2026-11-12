@@ -29,7 +29,7 @@ paths:
 
 - `/create-slide` は、取り込み（`scripts/ingest.ts`）、通読（`article-reader`）、構成案、執筆（`deck-writer`）、ビルドと検査、レビュー（`deck-reviewer`）の順に進む。構成案でユーザーの承認を待つのは、何を話すかの重み付けを人が決めるため（`--yes` のときだけ止まらない）
 - 作るファイルは `slides/<slug>/` の `source.md`（取り込んだ記事）、`material.md`（素材）、`outline.md`（構成案）、`deck.mdx`（原稿）、`review.md`（判定）と画像
-- 原稿の書き方（MDX）とレイアウトの指定の方法、デッキの検査（`pnpm check:decks`）は、テーマの作業で決めている最中。決まったら、スキルの「原稿の形」と `deck-writer`、`deck-reviewer` の定義を直す
+- 原稿の書き方は AGENTS.md の「スライドの原稿の書き方」と、スキルの「原稿の形」にある。レイアウトや定型の図を足したら、スキルの「原稿の形」と `deck-writer` の定義の対応表も直す
 
 ## スキルの置き場所
 

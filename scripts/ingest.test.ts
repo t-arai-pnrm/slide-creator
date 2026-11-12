@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, stat } from 'node:fs/promises'
+import { mkdtemp, readdir, readFile, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 
-import { ingest, SlugExistsError, slugFromInput } from './ingest.ts'
+import { ingest, ReservedSlugError, SlugExistsError, slugFromInput } from './ingest.ts'
 
 const PAGE = `<!doctype html>
 <html><head><title>例 | サイト</title><meta property="og:title" content="記事の題名"><meta name="author" content="著者"></head>
@@ -46,4 +46,33 @@ await test('URL の記事を全文のマークダウンにし、画像を保存�
 	await stat(join(slidesDir, 'sample-post', 'images', '01-a.png'))
 
 	await assert.rejects(ingest({ input, slidesDir, fetch: fakeFetch }), SlugExistsError)
+})
+
+await test('slug が index か 404 になる記事は、何も書かずに止め、--slug を案内する', async () => {
+	const slidesDir = await mkdtemp(join(tmpdir(), 'ingest-'))
+	const fakeFetch: typeof fetch = async () => {
+		throw new Error('使えない slug では記事を取得しない')
+	}
+	const cases: { input: string; slug?: string }[] = [
+		// index.html の 1 つ上のフォルダーも index
+		{ input: 'https://example.com/index/index.html' },
+		// index かどうかの判定より後で小文字にするので、Index は index になる
+		{ input: 'https://example.com/blog/Index.html' },
+		{ input: 'https://example.com/404' },
+		{ input: '/tmp/posts/index/index.mdx' },
+		{ input: 'https://example.com/blog/sample-post/', slug: 'Index' },
+		{ input: 'https://example.com/blog/sample-post/', slug: '404' },
+	]
+	await Promise.all(
+		cases.map(({ input, slug }) =>
+			assert.rejects(ingest({ input, slug, slidesDir, fetch: fakeFetch, taklogDir: slidesDir }), (error) => {
+				assert.ok(error instanceof ReservedSlugError, input)
+				assert.match(error.message, /--slug/)
+				return true
+			}),
+		),
+	)
+	assert.deepEqual(await readdir(slidesDir), [])
+	// 最後の部分が index でも、1 つ上のフォルダーの名前を使うので止めない
+	assert.equal(slugFromInput('https://example.com/blog/index/'), 'blog')
 })

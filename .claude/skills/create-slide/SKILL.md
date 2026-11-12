@@ -29,6 +29,7 @@ disable-model-invocation: true
 
 1. 取り込む。`node scripts/ingest.ts <URL かパス>` を実行する。
    - 終了コードが 2 なら、同じ slug のフォルダーがある。作り直す（`--force` を付けて実行し直す）か、別の名前にする（`--slug <名前>`）かをユーザーに聞く。`--yes` でも聞く。
+   - 終了コードが 3 なら、slug が `index` か `404` で、ビルドのほかのページと同じ名前になる。`--force` では直らないので、`--slug <名前>` で付ける名前をユーザーに聞く。`--yes` でも聞く。
    - スクリプトは、tak-dcxi.com の記事で、手元に taklog（`~/dev/taklog`、`TAKLOG_DIR` で変えられる）があれば、公開された HTML ではなく元の MDX を読む。
    - 完了条件: `slides/<slug>/source.md` があり、見出しの数と最後の段落が元の記事と合っている（Read で `source.md` の先頭と末尾を見て、記事の終わりまで取り込めたことを確かめる）。取れなかった画像はスクリプトが表示するので、ユーザーに伝える。
 2. 通読させる。`article-reader` に `slides/<slug>/source.md` のパスを渡す。係は `slides/<slug>/material.md` を書く。
@@ -40,13 +41,13 @@ disable-model-invocation: true
    - 完了条件: ユーザーが構成案を承認している。直しを求められたら `outline.md` を直して見せ直す。`--yes` のときは承認を待たない。
 4. 書かせる。`deck-writer` に、`material.md`、`outline.md`、`source.md` のパスを渡す。係は `slides/<slug>/deck.mdx` を書く。
 5. ビルドして検査する。`pnpm build` と `pnpm check:decks` を実行する。
-   - `pnpm check:decks`（はみ出し、コントラスト、本文の 5 行）は別の作業で作っている。まだなければ、`pnpm build` だけを実行し、検査をしていないことをユーザーへの報告に書く。
+   - `pnpm check:decks` は、各スライドの中身が枠に収まるか（はみ出し）だけを確かめる。コントラストと本文の 5 行の検査はまだないので、レビュー係が原稿で確かめる。`pnpm build` は、原稿の形の誤り（字下げした `<Slide`、手で書いた `page` と `total`、`title` がない）でも失敗する。
    - 失敗したら、出力をそのまま `deck-writer` に渡して直させ、もう一度実行する。
-   - 完了条件: 両方のコマンドが成功している（検査のコマンドがないときは `pnpm build` が成功している）。
+   - 完了条件: 両方のコマンドが成功している。
 6. レビューさせる。`deck-reviewer` に、`slides/<slug>/` のパスと、手順 5 の検査の出力を渡す。書く係とのやり取りは渡さない（レビューを独立させるため）。係は `slides/<slug>/review.md` を書く。
    - 判定が `changes` なら、指摘を `deck-writer` に渡して直させ、手順 5 と 6 をやり直す。2 周しても `approve` にならなければ、残った指摘をユーザーに見せて判断を仰ぐ。
    - 完了条件: 判定が `approve`。
-7. 報告する。`deck.mdx` のパス、スライドの枚数、レビューの判定、確かめていないこと（検査のコマンドがなかった、取れなかった画像など）をユーザーに伝える。
+7. 報告する。`deck.mdx` のパス、スライドの枚数、レビューの判定、確かめていないこと（取れなかった画像など）をユーザーに伝える。
 
 ## 構成案
 
@@ -74,4 +75,11 @@ disable-model-invocation: true
 
 ## 原稿の形
 
-原稿の書き方（MDX）は、テーマの作業で決めている最中である。いまは `src/pages/index.astro` の形に倣い、`<Slide>` の中に `<Fragment slot="title">` で題名、`<p slot="notes">` でスピーカーノートを書く。レイアウトを指定する方法もテーマの作業で決まるので、決まるまでは構成案のレイアウトを原稿のコメントに残す。どちらも決まったら、この節と `deck-writer` の定義を直す。
+原稿は `slides/<slug>/deck.mdx` に、AGENTS.md の「スライドの原稿の書き方」に沿って書く。frontmatter に `title` を書き、`<Slide>` の中に `<Fragment slot="title">` で題名、`<p slot="notes">` でスピーカーノートを書く。手本は `slides/sample/deck.mdx`（レイアウトと定型の図をすべて使う）と `slides/demo/deck.mdx`（コードを含む）。
+
+構成案のレイアウトは、`<Slide>` の `layout` で指定する。
+
+| レイアウト | 指定 |
+| --- | --- |
+| 表紙、章の扉、主張、引用、数値、最後 | `layout="cover"`、`"section"`、`"statement"`、`"quote"`、`"number"`、`"end"` |
+| 図解、コード、比較、画像、出典 | `layout` を書かず、本文に定型の図、コードブロック、画像、出典の一覧を置く（クラスは手本のとおり） |
