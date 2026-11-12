@@ -21,6 +21,7 @@
 		"test:e2e": "playwright test",
 		"test:html": "markuplint \"dist/**/*.html\"",
 		"test": "pnpm run check && pnpm run lint && pnpm run format:check && pnpm run test:unit",
+		"ingest": "node scripts/ingest.ts",
 		"verify": "node scripts/verify.ts",
 		"prepare": "lefthook install"
 	},
