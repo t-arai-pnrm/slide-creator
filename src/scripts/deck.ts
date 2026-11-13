@@ -4,6 +4,7 @@
  * 横長の画面で JavaScript が動くときだけ、スライドを 1 枚ずつ表示する（発表の表示）。縦長の画面と、
  * JavaScript が動かない環境では、HTML のとおり縦に並べて読む形のままにする（DESIGN.md の「枠」）。
  * 縦に並べて読む形でも、JavaScript が動くときは操作の部分を出し、前へと次へでスライドの枠まで画面を動かし、ノートを隠せるようにする。
+ * キーは、ページのスクロールに使うものを除いた ← → N D だけを使う。
  * URL に ?presenter が付いていれば、画面の向きにかかわらず発表者ビューにする。
  * 印刷の間は、すべてのスライドを紙に出すため、どの表示からでも縦に並べる形にする。
  *
@@ -126,6 +127,8 @@ export const initDeck = (): void => {
 	// 縦に並べて読む形のノートの状態は、発表の表示とは別に持つ。初期値が違い（こちらは出す）、
 	// 画面の向きを変えたときに、一方で切り替えた状態がもう一方に持ち込まれないようにするため
 	let scrollNotesShown = true
+	/** 縦に並べて読む形で、ページの上の端にいて、前のスライドへ画面を動かせないか */
+	let scrollAtStart = false
 	/** 縦に並べて読む形で、ページの下の端までスクロールし、次のスライドへ画面を動かせないか */
 	let scrollAtEnd = false
 	// 印刷の間は、表示を縦に並べる形に替える。kiso.css の [hidden] の display: none !important は印刷でも当たり、
@@ -174,7 +177,7 @@ export const initDeck = (): void => {
 		if (currentLabel) currentLabel.textContent = String(page)
 		// 操作の部分は main.deck の外にあるので、両方に継承されるよう文書のルートに書く
 		document.documentElement.style.setProperty('--deck-controls--progress', String(page / total))
-		button('prev')?.setAttribute('aria-disabled', String(index === 0))
+		button('prev')?.setAttribute('aria-disabled', String(index === 0 || (view === 'scroll' && scrollAtStart)))
 		button('next')?.setAttribute('aria-disabled', String(index === total - 1 || (view === 'scroll' && scrollAtEnd)))
 	}
 
@@ -238,30 +241,47 @@ export const initDeck = (): void => {
 		return frames.map((frame) => clamp(frame.getBoundingClientRect().top + window.scrollY, 0, maxScroll))
 	}
 
+	/** 小数のスクロールの位置の誤差で、同じ位置を別の位置と数えないよう、1px 未満の差は同じ位置とみなす */
+	const isSameScroll = (a: number, b: number) => Math.abs(a - b) < 1
+
 	/**
-	 * 今のスライド（枠の上端が画面の上の端にいちばん近いスライド）の番号と、次のスライドへ動かせるか。
-	 * 近さは、そのスライドへ動かしたときのスクロールの位置で比べる。下の端に寄せた位置が並ぶときは、前のスライドを今のスライドにし、
-	 * 前へで下の端より上のスライドに、次へで動けないときは押せない状態にする
+	 * 今のスライドの番号と、前と次のスライドへ画面を動かせるか。
+	 * ページの下の端より先へはスクロールできないので、最後のほうのスライドは、どれも下の端の位置（同じスクロールの位置）に寄る。
+	 * そのため、スクロールの位置だけでは、そのうちのどのスライドを見ているかが決まらない。
+	 * 今のスライド（index）の位置に画面があれば、index のままにする。発表の表示から縦長に替えたときや、ハッシュで移ったときに、
+	 * 下の端に寄せたスライドを別のスライドに書き換え、横長に戻したときに違うスライドへ戻さないため。
+	 * index の位置から離れていれば、枠の上端が画面の上の端にいちばん近いスライドを今のスライドにする。近さは、そのスライドへ動かしたときの
+	 * スクロールの位置で比べ、同じ近さなら後のスライドを選ぶ。いちばん下までスクロールしたときに、最後のスライドを今のスライドにするため
 	 */
 	const scrollPosition = () => {
 		const targets = scrollTargets()
 		const y = window.scrollY
 		let current = 0
-		targets.forEach((target, i) => {
-			if (Math.abs(target - y) < Math.abs((targets[current] ?? 0) - y)) current = i
-		})
-		const nextTarget = targets[current + 1]
-		// 小数のスクロールの位置の誤差で、動かせない次のスライドを押せる状態にしないよう、1px までは同じ位置とみなす
-		return { current, targets, atEnd: nextTarget === undefined || nextTarget - y < 1 }
+		const indexTarget = targets[index]
+		if (indexTarget !== undefined && isSameScroll(indexTarget, y)) current = index
+		else {
+			targets.forEach((target, i) => {
+				if (Math.abs(target - y) <= Math.abs((targets[current] ?? 0) - y)) current = i
+			})
+		}
+		// 前へと次へは、今のスライドから数えて、今の位置から画面を動かせるスライドまで進む。下の端に寄せたスライドは、どれも今の位置と同じなので飛ばす
+		const prev = targets.findLastIndex((target, i) => i < current && !isSameScroll(target, y) && target < y)
+		const next = targets.findIndex((target, i) => i > current && !isSameScroll(target, y) && target > y)
+		return {
+			current,
+			prevTarget: prev === -1 ? undefined : targets[prev],
+			nextTarget: next === -1 ? undefined : targets[next],
+		}
 	}
 
 	const syncScrollPosition = () => {
 		// 印刷の間も縦に並べる形になるが、発表の表示に戻ったときに印刷の前のスライドへ戻せるよう、index を書き換えない
 		if (view !== 'scroll' || printing) return
-		const { current, atEnd } = scrollPosition()
+		const { current, prevTarget, nextTarget } = scrollPosition()
 		// 横長に替えたときに、読んでいたスライドから発表の表示を始められるよう、今のスライドを index に写す
 		index = current
-		scrollAtEnd = atEnd
+		scrollAtStart = prevTarget === undefined
+		scrollAtEnd = nextTarget === undefined
 		renderProgress()
 	}
 
@@ -281,8 +301,8 @@ export const initDeck = (): void => {
 
 	/** 縦に並べて読む形で、今のスライドの前（-1）か次（1）のスライドの枠の上端まで画面を動かす */
 	const scrollByStep = (step: -1 | 1) => {
-		const { current, targets } = scrollPosition()
-		const target = targets[current + step]
+		const { prevTarget, nextTarget } = scrollPosition()
+		const target = step === -1 ? prevTarget : nextTarget
 		if (target === undefined) return
 		// 縦に並べて読む形は動かさない（DESIGN.md の「動かしてよい場面」）。CSS で scroll-behavior を足しても滑らせない
 		window.scrollTo({ top: target, behavior: 'instant' })
@@ -292,7 +312,8 @@ export const initDeck = (): void => {
 
 	const renderNotes = () => {
 		const shown = shownView()
-		// 印刷の間は data-notes を外し、ノートを紙に出す。縦に並べて読む形でノートを隠していても、印刷には残す
+		// 印刷の間は data-notes を外し、JavaScript が動かないときと同じ、操作の部分のない縦に並べる形の状態にする。
+		// ノートは、data-notes にかかわらず、印刷では CSS で隠れる（src/components/Slide.astro）ので、紙には出ない
 		if (printing) delete deck.dataset.notes
 		else if (shown === 'scroll') deck.dataset.notes = scrollNotesShown ? 'shown' : 'hidden'
 		// 発表者ビューは、ノートを読むための画面なので常に出す
@@ -409,6 +430,20 @@ export const initDeck = (): void => {
 
 	// ---- 表示の切り替え ----
 
+	// 縦に並べて読む形では、前へと次へのキーを左右の矢印だけにする（keydown の処理）ので、aria-keyshortcuts も効くキーだけにする。
+	// 1 枚ずつ表示する形のキーは、HTML に書いた値（src/components/DeckControls.astro）を読んで戻す
+	const moveShortcuts = new Map(
+		(
+			[
+				['prev', 'ArrowLeft'],
+				['next', 'ArrowRight'],
+			] as const
+		).map(([action, scroll]) => [
+			action,
+			{ scroll, paged: button(action)?.getAttribute('aria-keyshortcuts') ?? scroll },
+		]),
+	)
+
 	const renderView = () => {
 		const shown = shownView()
 		if (shown === 'scroll') delete deck.dataset.view
@@ -423,6 +458,9 @@ export const initDeck = (): void => {
 		const presenterButton = button('presenter')
 		if (presenterButton) presenterButton.hidden = shown === 'presenter' || shown === 'scroll'
 		if (fullscreenButton) fullscreenButton.hidden = !document.fullscreenEnabled || shown === 'scroll'
+		for (const [action, shortcuts] of moveShortcuts) {
+			button(action)?.setAttribute('aria-keyshortcuts', shown === 'scroll' ? shortcuts.scroll : shortcuts.paged)
+		}
 		renderSlides()
 		renderProgress()
 		renderNotes()
@@ -562,10 +600,27 @@ export const initDeck = (): void => {
 	})
 
 	document.addEventListener('keydown', (event) => {
-		if (view === 'scroll') return
 		// Ctrl、Cmd、Alt との組み合わせは、ブラウザと OS のショートカットに残す
 		if (event.defaultPrevented || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return
 		if (isEditable(event.target)) return
+		if (view === 'scroll') {
+			// 縦に並べて読む形では、ツールチップと aria-keyshortcuts が伝えるキー（← → N D）だけを使う（DESIGN.md の「操作の部分」）。
+			// スペース、Page Up / Page Down、上下の矢印、Home / End は、ページのスクロールに使うので、ブラウザに残す
+			const scrollAction = (
+				{
+					ArrowLeft: 'prev',
+					ArrowRight: 'next',
+					n: 'notes',
+					N: 'notes',
+					d: 'theme',
+					D: 'theme',
+				} as const satisfies Record<string, Action>
+			)[event.key]
+			if (!scrollAction) return
+			event.preventDefault()
+			run(scrollAction)
+			return
+		}
 		// フォーカスしたノートの中では、ページ単位と端までのスクロールのキーを、長いノートのスクロールに残す。
 		// 左右の矢印はノートの横のスクロールに使わないので、スライドの移動のままにする
 		if (isInNotes(event.target) && NOTES_SCROLL_KEYS.has(event.key)) return

@@ -84,11 +84,18 @@ const { title } = Astro.props
 		 * （is-for-ancestor-context、nest-own-states-only、placement-via-public-flag）。
 		 * スタイルクエリは親の値を問い合わせる。._timer と ._controls の親は body で、スライドの親の .deck は body から値を継承する。
 		 * body の内部プロパティは .deck と .slide にも継承されるので、Slide.astro の内部プロパティと重ならない名前にする。
-		 * 帯の上端までの長さと、それを求める値だけは、文書のルート（html）のスクロールの余白でも使うので、html で宣言する
+		 * 帯の上端までの長さと、それを求める値だけは、文書のルート（html）のスクロールの余白でも使うので、html で宣言する。
+		 *
+		 * html で宣言する長さは、DESIGN.md の rem の値を em で書く。WebKit は、html の規則の中の rem を、html の文字の大きさ
+		 * （画面の幅で 11px〜16px に変わる）ではなく 16px で計算するため（375×812 で、スクロールの余白が帯の上端より約 19px 大きくなった）。
+		 * html の em は html の文字の大きさなので、どのブラウザでも rem で書くつもりの値になる。
+		 * これらは登録していないカスタムプロパティで、em は var() で読む要素の文字の大きさで解決される。
+		 * 読む要素（html、._controls、.slide、ノートの aside）は、どれも文字の大きさが文書のルートと同じ（aside の notes は 1rem）なので、
+		 * body より下でも rem と同じ値になる。読む要素を足すときや、ノートの文字の大きさを変えるときは、この前提を確かめる
 		 */
 		html {
-			/* 発表の表示で枠の上の辺と右の辺から、縦に並べて読む形で画面の下の端から離す距離（DESIGN.md の「操作の部分」） */
-			--_controls-inset: 1rem;
+			/* 発表の表示で枠の上の辺と右の辺から、縦に並べて読む形で画面の下の端から離す距離（DESIGN.md の「操作の部分」の 1rem） */
+			--_controls-inset: 1em;
 
 			/*
 			 * 縦に並べて読む形で、最後のスライドの下に空ける長さを求めるための、帯の高さ。
@@ -96,10 +103,10 @@ const { title } = Astro.props
 			 * ボタンの高さは、2.25rem と押せる部分の大きさ（マウスで 24px 以上、タッチで 44px 以上）の大きいほう。
 			 * マウスの 24px（1.5rem）は 2.25rem を超えないので、タッチのときだけ比べる（hit-area-min-size の値）。
 			 * 帯の高さは、ボタンの高さに、帯の内側の余白（上下の 0.25rem）、帯の枠（上下の細い線）、進み具合の線（細い線）を足したもの。
-			 * DESIGN.md の「操作の部分」の値を変えたら、ここも変える
+			 * DESIGN.md の「操作の部分」の値を変えたら、ここも変える。rem の値は、上に書いた理由で em で書く
 			 */
-			--_controls-button-block-size: 2.25rem;
-			--_controls-band-block-size: calc(var(--_controls-button-block-size) + 0.25rem * 2 + 1px * 3);
+			--_controls-button-block-size: 2.25em;
+			--_controls-band-block-size: calc(var(--_controls-button-block-size) + 0.25em * 2 + 1px * 3);
 
 			/*
 			 * 縦に並べて読む形で、画面の下の端から帯の上端までの長さ。帯は、セーフエリアにいつもの距離を足した位置に、帯の高さで置く。
@@ -110,7 +117,7 @@ const { title } = Astro.props
 			);
 
 			@media (any-pointer: coarse) {
-				--_controls-button-block-size: max(2.25rem, 44px, 44 / 16 * 1rem);
+				--_controls-button-block-size: max(2.25em, 44px, 44 / 16 * 1em);
 			}
 
 			/*
