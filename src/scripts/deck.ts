@@ -3,6 +3,7 @@
  *
  * 横長の画面で JavaScript が動くときだけ、スライドを 1 枚ずつ表示する（発表の表示）。縦長の画面と、
  * JavaScript が動かない環境では、HTML のとおり縦に並べて読む形のままにする（DESIGN.md の「枠」）。
+ * 縦に並べて読む形でも、JavaScript が動くときは操作の部分を出し、前へと次へでスライドの枠まで画面を動かし、ノートを隠せるようにする。
  * URL に ?presenter が付いていれば、画面の向きにかかわらず発表者ビューにする。
  * 印刷の間は、すべてのスライドを紙に出すため、どの表示からでも縦に並べる形にする。
  *
@@ -122,6 +123,11 @@ export const initDeck = (): void => {
 	let view: View = 'scroll'
 	let index = indexFromHash(location.hash, total)
 	let notesShown = false
+	// 縦に並べて読む形のノートの状態は、発表の表示とは別に持つ。初期値が違い（こちらは出す）、
+	// 画面の向きを変えたときに、一方で切り替えた状態がもう一方に持ち込まれないようにするため
+	let scrollNotesShown = true
+	/** 縦に並べて読む形で、ページの下の端までスクロールし、次のスライドへ画面を動かせないか */
+	let scrollAtEnd = false
 	// 印刷の間は、表示を縦に並べる形に替える。kiso.css の [hidden] の display: none !important は印刷でも当たり、
 	// 発表の表示のまま印刷すると、今のスライドしか紙に出ないため。view は替えず、印刷が終われば元の表示に戻す
 	let printing = false
@@ -169,7 +175,7 @@ export const initDeck = (): void => {
 		// 操作の部分は main.deck の外にあるので、両方に継承されるよう文書のルートに書く
 		document.documentElement.style.setProperty('--deck-controls--progress', String(page / total))
 		button('prev')?.setAttribute('aria-disabled', String(index === 0))
-		button('next')?.setAttribute('aria-disabled', String(index === total - 1))
+		button('next')?.setAttribute('aria-disabled', String(index === total - 1 || (view === 'scroll' && scrollAtEnd)))
 	}
 
 	const writeHash = () => {
@@ -219,25 +225,102 @@ export const initDeck = (): void => {
 		scrollToCurrent()
 	})
 
+	// ---- 縦に並べて読む形の、今のスライド ----
+
+	const frames = slides.map((slide) => queryHTMLElement(slide, ':scope > ._frame') ?? slide)
+
+	/**
+	 * 各スライドの枠の上端を画面の上の端に合わせるときの、スクロールの位置。
+	 * ページの下の端より先へはスクロールできないので、最後のほうのスライドは、下の端の位置に寄せる
+	 */
+	const scrollTargets = () => {
+		const maxScroll = Math.max(document.documentElement.scrollHeight - window.innerHeight, 0)
+		return frames.map((frame) => clamp(frame.getBoundingClientRect().top + window.scrollY, 0, maxScroll))
+	}
+
+	/**
+	 * 今のスライド（枠の上端が画面の上の端にいちばん近いスライド）の番号と、次のスライドへ動かせるか。
+	 * 近さは、そのスライドへ動かしたときのスクロールの位置で比べる。下の端に寄せた位置が並ぶときは、前のスライドを今のスライドにし、
+	 * 前へで下の端より上のスライドに、次へで動けないときは押せない状態にする
+	 */
+	const scrollPosition = () => {
+		const targets = scrollTargets()
+		const y = window.scrollY
+		let current = 0
+		targets.forEach((target, i) => {
+			if (Math.abs(target - y) < Math.abs((targets[current] ?? 0) - y)) current = i
+		})
+		const nextTarget = targets[current + 1]
+		// 小数のスクロールの位置の誤差で、動かせない次のスライドを押せる状態にしないよう、1px までは同じ位置とみなす
+		return { current, targets, atEnd: nextTarget === undefined || nextTarget - y < 1 }
+	}
+
+	const syncScrollPosition = () => {
+		// 印刷の間も縦に並べる形になるが、発表の表示に戻ったときに印刷の前のスライドへ戻せるよう、index を書き換えない
+		if (view !== 'scroll' || printing) return
+		const { current, atEnd } = scrollPosition()
+		// 横長に替えたときに、読んでいたスライドから発表の表示を始められるよう、今のスライドを index に写す
+		index = current
+		scrollAtEnd = atEnd
+		renderProgress()
+	}
+
+	let syncFrame: number | undefined
+	/** スクロールのたびに枠の位置を測らないよう、次の描画の前に 1 回だけ測る */
+	const scheduleSyncScrollPosition = () => {
+		if (syncFrame !== undefined) return
+		syncFrame = requestAnimationFrame(() => {
+			syncFrame = undefined
+			syncScrollPosition()
+		})
+	}
+
+	window.addEventListener('scroll', scheduleSyncScrollPosition, { passive: true })
+	// ノートの切り替え、書体の読み込み、画面の幅の変化で枠の位置が変わると、スクロールしなくても今のスライドが替わりうる
+	new ResizeObserver(scheduleSyncScrollPosition).observe(deck)
+
+	/** 縦に並べて読む形で、今のスライドの前（-1）か次（1）のスライドの枠の上端まで画面を動かす */
+	const scrollByStep = (step: -1 | 1) => {
+		const { current, targets } = scrollPosition()
+		const target = targets[current + step]
+		if (target === undefined) return
+		// 縦に並べて読む形は動かさない（DESIGN.md の「動かしてよい場面」）。CSS で scroll-behavior を足しても滑らせない
+		window.scrollTo({ top: target, behavior: 'instant' })
+	}
+
 	// ---- ノート ----
 
 	const renderNotes = () => {
 		const shown = shownView()
-		if (shown === 'scroll') delete deck.dataset.notes
+		// 印刷の間は data-notes を外し、ノートを紙に出す。縦に並べて読む形でノートを隠していても、印刷には残す
+		if (printing) delete deck.dataset.notes
+		else if (shown === 'scroll') deck.dataset.notes = scrollNotesShown ? 'shown' : 'hidden'
 		// 発表者ビューは、ノートを読むための画面なので常に出す
 		else deck.dataset.notes = shown === 'presenter' || notesShown ? 'shown' : 'hidden'
-		button('notes')?.setAttribute('aria-pressed', String(notesShown))
+		// 印刷の間は view のノートの状態のままにし、印刷の前後で押した状態を変えない
+		button('notes')?.setAttribute('aria-pressed', String(view === 'scroll' ? scrollNotesShown : notesShown))
 	}
 
 	const toggleNotes = () => {
-		notesShown = !notesShown
+		if (view !== 'scroll') {
+			notesShown = !notesShown
+			renderNotes()
+			return
+		}
+		// ノートを隠すと、今のスライドより上のノートの分だけ枠が上へずれ、読んでいたスライドを見失う。
+		// 今のスライドの枠を、切り替える前と同じ画面の位置に戻す
+		const frame = frames[scrollPosition().current]
+		const before = frame?.getBoundingClientRect().top
+		scrollNotesShown = !scrollNotesShown
 		renderNotes()
+		if (frame && before !== undefined) {
+			window.scrollBy({ top: frame.getBoundingClientRect().top - before, behavior: 'instant' })
+		}
 	}
 
 	// ---- 全画面 ----
 
 	const fullscreenButton = button('fullscreen')
-	if (fullscreenButton) fullscreenButton.hidden = !document.fullscreenEnabled
 
 	const toggleFullscreen = () => {
 		if (!document.fullscreenEnabled) return
@@ -330,13 +413,16 @@ export const initDeck = (): void => {
 		const shown = shownView()
 		if (shown === 'scroll') delete deck.dataset.view
 		else deck.dataset.view = shown
-		if (controls) controls.hidden = shown === 'scroll'
+		// 縦に並べて読む形でも出し、印刷の間だけ隠す。JavaScript が動かないときは、HTML の hidden のまま出さない
+		if (controls) controls.hidden = printing
 		if (timer) timer.hidden = shown !== 'presenter'
 		// 発表者ビューから、さらに発表者ビューを開いたり、ノートを隠したりする意味はないので、ボタンを出さない
-		for (const action of ['notes', 'presenter'] as const) {
-			const element = button(action)
-			if (element) element.hidden = shown === 'presenter'
-		}
+		const notesButton = button('notes')
+		if (notesButton) notesButton.hidden = shown === 'presenter'
+		// 縦に並べて読む形（スマートフォンの縦長の画面）では、全画面と発表者ビューを使う場面がないので出さない（DESIGN.md の「操作の部分」）
+		const presenterButton = button('presenter')
+		if (presenterButton) presenterButton.hidden = shown === 'presenter' || shown === 'scroll'
+		if (fullscreenButton) fullscreenButton.hidden = !document.fullscreenEnabled || shown === 'scroll'
 		renderSlides()
 		renderProgress()
 		renderNotes()
@@ -350,10 +436,18 @@ export const initDeck = (): void => {
 		if (view !== 'scroll') {
 			writeHash()
 			wake()
-		} else if (previous !== 'scroll') {
+			return
+		}
+		// 縦に並べて読む形では操作の部分を薄くしない（DESIGN.md の「操作の部分」）。発表の表示で付けた data-idle と、
+		// 待っている間のタイマーを残すと、縦長に替えた後も薄いまま残るか、2 秒後に薄くなるので、ここで外す
+		clearTimeout(idleTimeout)
+		controls?.removeAttribute('data-idle')
+		if (previous !== 'scroll') {
 			// 縦に並べる形に戻ったとき、発表の表示で見ていたスライドから読めるようにする
 			scrollToCurrent()
 		}
+		// 初めて開いたときは、この後でハッシュのスライドまでスクロールするので、今のスライドはスクロールが済んでから測る
+		scheduleSyncScrollPosition()
 	}
 
 	// ---- 印刷 ----
@@ -383,6 +477,7 @@ export const initDeck = (): void => {
 	const sleep = () => {
 		// キーボードで操作の部分にいる人から、操作の部分を隠さない
 		if (!controls || controls.querySelector(':focus-visible')) return
+		if (view === 'scroll') return
 		controls.toggleAttribute('data-idle', true)
 	}
 
@@ -413,13 +508,15 @@ export const initDeck = (): void => {
 	const run = (action: Action) => {
 		switch (action) {
 			case 'prev':
-				goTo(index - 1)
+				if (view === 'scroll') scrollByStep(-1)
+				else goTo(index - 1)
 				break
 			case 'next':
-				goTo(index + 1)
+				if (view === 'scroll') scrollByStep(1)
+				else goTo(index + 1)
 				break
 			case 'notes':
-				if (view === 'present') toggleNotes()
+				if (view !== 'presenter') toggleNotes()
 				break
 			case 'fullscreen':
 				toggleFullscreen()

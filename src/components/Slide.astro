@@ -8,6 +8,9 @@
  *
  * @prop {length} [--slide--stage-block-size=100svb] 枠を収める高さ。枠の幅の上限を、この高さと 16:9 の比から決める。
  *   発表者ビューでは、置く側のデッキが、枠を置くグリッドの行の高さを渡す
+ * @prop {length} [--slide--stack-end-space=env(safe-area-inset-bottom)] 縦に並べる形の最後のスライドの下に空ける長さ。
+ *   画面の下の端から、セーフエリアと、画面に固定して置いたものが覆う高さ。
+ *   置く側のデッキが、操作の部分を画面の下に固定するとき、セーフエリアを含めた帯の上端までの長さを渡す
  */
 interface Props {
 	/** 1 から数えたページ番号。デッキの中で重ならないので、題名の id にも使う */
@@ -70,6 +73,12 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 
 			/* 枠を収める高さ。ふだんは画面の高さで、ノートの領域を取ったときはその残り */
 			--_stage-block-size: var(--slide--stage-block-size, 100svb);
+
+			/*
+			 * 縦に並べる形の最後のスライドの下に空ける長さ。ふだんはセーフエリアの分で、いつもの余白は 0 なので比べる
+			 * （safe-area-combine-with-max）。置く側が画面の下に固定したものの分を渡すときは、セーフエリアを含めた長さを受ける
+			 */
+			--_stack-end-space: var(--slide--stack-end-space, max(0px, env(safe-area-inset-bottom)));
 
 			/* スライドが替わったときに要素を順に出す間隔（DESIGN.md の「動かしてよい場面」） */
 			--_stagger: var(--duration--stagger);
@@ -165,23 +174,27 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			}
 
 			/*
-			 * 縦に並べる形の最後のスライドは、画面の下の端からセーフエリアの分だけ空ける（DESIGN.md の「画面の端」）。
+			 * 縦に並べる形の最後のスライドは、画面の下の端から --_stack-end-space の分だけ空ける（DESIGN.md の「画面の端」）。
 			 * ノートが出ていれば、面を端まで塗るためノートの内側の余白で空ける（下の aside）ので、ノートが出ていないときだけここで空ける。
-			 * ノートが出ていないのは、ノートの要素がないときと、ノートを隠す横長の画面（JavaScript が動かず縦に並べる形のまま）。
-			 * 縦に並べる形では data-notes がないので、ノートを隠す条件は aside の @media だけで決まる。
+			 * ノートが出ていないのは、ノートの要素がないとき、ノートを隠す横長の画面（JavaScript が動かず縦に並べる形のまま）、
+			 * 操作の部分のノートのボタンでノートを隠したとき（data-notes='hidden'）。
+			 * JavaScript が動かないときは data-notes がないので、横長の画面でノートを隠す条件は aside の @media だけで決まる。
 			 * そのため、横長の画面の条件（aspect-ratio >= 1）は、aside の @media のノートを隠す条件とそろえる。片方を変えたら、もう片方も変える。
 			 * 印刷ではセーフエリアが 0 で、足しても値が変わらないので、条件に含めない。
-			 * いつもの余白は 0 で、セーフエリアと比べる（safe-area-combine-with-max）。
-			 * ネストを 2 層までにするため、ノートを隠す横長の画面と、ノートの要素がないときを、2 つの規則に分ける（nesting-depth-one）
+			 * ネストを 2 層までにするため、ノートを隠す 3 つの場合を、別の規則に分ける（nesting-depth-one）
 			 */
 			&:is(:global(.deck:not([data-view])) > *):last-child {
 				@media (aspect-ratio >= 1) {
-					padding-block-end: max(0px, env(safe-area-inset-bottom));
+					padding-block-end: var(--_stack-end-space);
 				}
 			}
 
 			&:is(:global(.deck:not([data-view])) > *):last-child:not(:has(> aside)) {
-				padding-block-end: max(0px, env(safe-area-inset-bottom));
+				padding-block-end: var(--_stack-end-space);
+			}
+
+			&:is(:global(.deck:not([data-view])[data-notes='hidden']) > *):last-child {
+				padding-block-end: var(--_stack-end-space);
 			}
 
 			/* DESIGN.md の「枠」のとおり、枠を中央に置く */
@@ -469,9 +482,12 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			/*
 			 * 発表の表示でノートを出したときと発表者ビューでは、画面の向きにかかわらず出す。
 			 * 枠の下か横に別の領域として置く。
-			 * ノートの領域に収まらない長さのノートは、領域の中でスクロールさせる
+			 * ノートの領域に収まらない長さのノートは、領域の中でスクロールさせる。
+			 * 縦に並べる形の data-notes='shown' は、縦長の画面のノートの初期値で、この指定は要らないので、data-view で除く。
+			 * 除く条件は :where() に入れ、詳細度を上げない。下の、発表者ビューの前と次のスライドのノートを隠す規則が、
+			 * 詳細度ではなく書く順で、この規則に勝つため（order-by-layer-not-specificity）
 			 */
-			&:is(:global(.deck[data-notes='shown']) *) {
+			&:is(:global(.deck[data-notes='shown']:where([data-view])) *) {
 				@media screen {
 					display: block flow;
 					overflow-y: auto;
@@ -479,12 +495,24 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			}
 
 			/*
-			 * 画面の下の端に接する表示（発表の表示でノートを出したときと、縦に並べる形の最後のスライド）では、
-			 * 面を画面の端まで塗り、文字だけをセーフエリアの内側に寄せる（safe-area-background-to-edge、safe-area-combine-with-max）
+			 * 縦に並べる形で、操作の部分のノートのボタンでノートを隠したとき（DESIGN.md の「枠」）。
+			 * data-notes がないとき（JavaScript が動かない）は出したままにする
 			 */
-			&:is(:global(.deck[data-view='present']) *),
-			&:is(:global(.deck:not([data-view])) > .slide:last-child *) {
+			&:is(:global(.deck:not([data-view])[data-notes='hidden']) *) {
+				display: none;
+			}
+
+			/*
+			 * 画面の下の端に接する表示（発表の表示でノートを出したときと、縦に並べる形の最後のスライド）では、
+			 * 面を画面の端まで塗り、文字だけをセーフエリアの内側に寄せる（safe-area-background-to-edge、safe-area-combine-with-max）。
+			 * 縦に並べる形の最後のスライドでは、セーフエリアの代わりに、画面に固定したものの分を含む --_stack-end-space と比べる
+			 */
+			&:is(:global(.deck[data-view='present']) *) {
 				padding-block-end: max(1.5rem, env(safe-area-inset-bottom));
+			}
+
+			&:is(:global(.deck:not([data-view])) > .slide:last-child *) {
+				padding-block-end: max(1.5rem, var(--_stack-end-space));
 			}
 
 			/*
@@ -495,7 +523,10 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 				padding-inline: var(--gutter--page);
 			}
 
-			/* 発表者ビューの前と次のスライドは、枠だけを見せる。上の指定より後に書いて勝たせる */
+			/*
+			 * 発表者ビューの前と次のスライドは、枠だけを見せる。上のノートを出す規則より後に書いて勝たせる。
+			 * 詳細度は上のノートを出す規則と同じなので、上の規則のセレクタに条件を足すときは、:where() に入れて詳細度を上げない
+			 */
 			&:is(.slide:is([data-slide='prev'], [data-slide='next']) *) {
 				display: none;
 			}
