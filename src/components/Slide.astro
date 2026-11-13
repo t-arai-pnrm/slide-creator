@@ -128,21 +128,21 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 				grid-area: --notes;
 				align-self: stretch;
 			}
-		}
 
-		.slide + .slide {
-			@media print {
-				break-before: page;
-			}
+			& + & {
+				@media print {
+					break-before: page;
+				}
 
-			/*
+				/*
 			 * 枠の面と枠の外が同じ色なので、線がないとスライドの境目が見えない。
 			 * 発表の表示と発表者ビューでは、hidden で隠したスライドも兄弟に数えるので、
 			 * 縦に並べる形（data-view がない）に限る
 			 */
-			&:is(:global(.deck:not([data-view])) > *) {
-				@media screen {
-					border-block-start: 1px solid var(--border--base);
+				&:is(:global(.deck:not([data-view])) > *) {
+					@media screen {
+						border-block-start: 1px solid var(--border--base);
+					}
 				}
 			}
 		}
@@ -207,9 +207,9 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			display: block grid;
 			reading-flow: grid-rows;
 			grid-template:
-				'--heading' auto
+				'--heading'
 				'--body' 1fr
-				'--page' auto
+				'--page'
 				/ 1fr;
 			row-gap: var(--spacing--md);
 			padding-block: var(--guide--block);
@@ -220,9 +220,9 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 				reading-flow: grid-rows;
 				grid-template:
 					'.' 1fr
-					'--heading' auto
-					'--body' auto
-					'--page' auto
+					'--heading'
+					'--body'
+					'--page'
 					/ 1fr;
 			}
 
@@ -231,10 +231,10 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 				reading-flow: grid-rows;
 				grid-template:
 					'.' 1fr
-					'--heading' auto
-					'--body' auto
+					'--heading'
+					'--body'
 					'.' 1fr
-					'--page' auto
+					'--page'
 					/ 1fr;
 			}
 
@@ -328,7 +328,7 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			}
 
 			& > ._chapter + ._title {
-				margin-block-start: var(--spacing--xs);
+				margin-block-start: var(--spacing--sm);
 			}
 		}
 
@@ -355,9 +355,6 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			font-size: var(--text--title--font-size);
 			font-weight: var(--text--title--font-weight);
 			line-height: var(--text--title--leading);
-
-			/* 題名が 2 行になったとき、後ろの行に数文字だけ残らないよう、行の長さをそろえる */
-			text-wrap: balance;
 
 			/* 表紙、章の扉、主張は display のスタイルにする（DESIGN.md の「レイアウトの一覧」） */
 			&:is(
