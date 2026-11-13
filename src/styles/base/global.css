@@ -33,6 +33,8 @@
 	/*
 	 * rem の基準を画面の幅に比例させ、rem で決めたスライドの外（ノート、操作の部分、ツールチップ、タイマー）を、
 	 * 狭い画面でまとめて縮める。幅が 1280px 以上では 16px のままにし、11px で止める（DESIGN.md の「文字のスタイル」）。
+	 * 変わる区間（880px〜1280px）は、共通の区間（--fluid--*、375px〜1280px）とそろえない（shared-fluid-range）。
+	 * ルートの文字の大きさは、操作の部分とノートを狭い画面で縮めるために 11px〜16px、1.25svi と決めた値で、ページの余白とは別に決めているため。
 	 * ブラウザの文字の大きさの設定には追従させないと決めている（no-root-font-size-change、verify-text-resize-200 と違う点）
 	 */
 	/* stylelint-disable-next-line rule-selector-property-disallowed-list, declaration-property-value-disallowed-list -- DESIGN.md で 11px と 16px に決め、ブラウザの文字の大きさの設定に追従させないため（上のコメント） */
