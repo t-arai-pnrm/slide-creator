@@ -99,11 +99,20 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 
 			/*
 			 * 縦に並べる形の最後のスライドは、画面の下の端からセーフエリアの分だけ空ける（DESIGN.md の「画面の端」）。
-			 * ノートがあれば、面を端まで塗るためノートの内側の余白で空ける（下の ._notes）ので、ノートがないときだけここで空ける。
+			 * ノートが出ていれば、面を端まで塗るためノートの内側の余白で空ける（下の ._notes）ので、ノートが出ていないときだけここで空ける。
+			 * ノートが出ていないのは、ノートの要素がないときと、ノートを隠す横長の画面（JavaScript が動かず縦に並べる形のまま）。
+			 * 縦に並べる形では data-notes がないので、ノートを隠す条件は ._notes の @media だけで決まる。
+			 * 印刷ではセーフエリアが 0 で、足しても値が変わらないので、条件に含めない。
 			 * いつもの余白は 0 で、セーフエリアと比べる（safe-area-combine-with-max）
 			 */
-			&:is(:global(.deck:not([data-view])) > *):last-child:not(:has(> ._notes)) {
-				padding-block-end: max(0px, env(safe-area-inset-bottom));
+			&:is(:global(.deck:not([data-view])) > *):last-child {
+				@media (aspect-ratio >= 1) {
+					padding-block-end: max(0px, env(safe-area-inset-bottom));
+				}
+
+				&:not(:has(> ._notes)) {
+					padding-block-end: max(0px, env(safe-area-inset-bottom));
+				}
 			}
 
 			/* DESIGN.md の「枠」のとおり、枠を中央に置く */
