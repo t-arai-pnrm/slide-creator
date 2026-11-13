@@ -89,8 +89,7 @@ const formatElapsed = (ms: number) => {
 }
 
 /** ノートの領域（とその中）か。ノートは今のスライドで tabindex を持ち、フォーカスしてスクロールする */
-const isInNotes = (target: EventTarget | null) =>
-	target instanceof Element && target.closest('.slide > ._notes') !== null
+const isInNotes = (target: EventTarget | null) => target instanceof Element && target.closest('.slide > aside') !== null
 
 /** ノートの中では、ノートのスクロールに残すキー。ページ単位のスクロールと、端までのスクロールに使う */
 const NOTES_SCROLL_KEYS: ReadonlySet<string> = new Set(['PageDown', 'PageUp', 'Home', 'End'])
@@ -157,7 +156,7 @@ export const initDeck = (): void => {
 		// ノートの tabindex="0" は、長いノートを領域の中でスクロールさせる表示（発表の表示と発表者ビュー）の、今のスライドにだけ付ける。
 		// 縦に並べる形で付けると、ノートのあるスライドごとに Tab の止まる場所が増えるため（src/components/Slide.astro）
 		slides.forEach((slide, i) => {
-			const notes = queryHTMLElement(slide, ':scope > ._notes')
+			const notes = queryHTMLElement(slide, ':scope > aside')
 			if (!notes) return
 			if (shown !== 'scroll' && i === index) notes.tabIndex = 0
 			else notes.removeAttribute('tabindex')
@@ -539,7 +538,7 @@ export const initDeck = (): void => {
 		}
 		if (isInteractive(event.target)) return
 		// ノートの領域はデッキの中にあるが、ノートをスクロールしたり読んだりするクリックで、スライドを移さない
-		if (event.target instanceof Element && event.target.closest('.slide > ._notes')) return
+		if (event.target instanceof Element && event.target.closest('.slide > aside')) return
 		// 文字を選んだ操作は、移動に数えない
 		if (getSelection()?.isCollapsed === false) return
 		const isLeftThird = event.clientX < document.documentElement.clientWidth / 3

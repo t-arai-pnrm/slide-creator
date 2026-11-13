@@ -215,7 +215,7 @@ test.describe('横長の画面', () => {
 	test('ノートの領域をクリックしても、スライドを移さない', async ({ page }) => {
 		await page.goto(`${DECK_PATH}#2`)
 		await page.keyboard.press('n')
-		const notes = slides(page).nth(1).locator('._notes')
+		const notes = slides(page).nth(1).locator(':scope > aside')
 		await expect(notes).toBeVisible()
 		// 次へ進む側（左の 3 分の 1 の外）をクリックする
 		const box = await notes.boundingBox()
@@ -227,11 +227,11 @@ test.describe('横長の画面', () => {
 	test('今のスライドのノートだけがキーボードでフォーカスでき、名前が付いている', async ({ page }) => {
 		await page.goto(DECK_PATH)
 		await page.keyboard.press('n')
-		const notes = slides(page).first().locator('._notes')
+		const notes = slides(page).first().locator(':scope > aside')
 		await expect(notes).toHaveAttribute('tabindex', '0')
 		await expect(notes).toHaveAccessibleName(`スピーカーノート（1 / ${TOTAL}）`)
 		// 今のスライドのほかは、Tab の止まる場所にしない
-		await expect(page.locator('main.deck > section.slide > ._notes[tabindex]')).toHaveCount(1)
+		await expect(page.locator('main.deck > section.slide > aside[tabindex]')).toHaveCount(1)
 		await notes.focus()
 		await expect(notes).toBeFocused()
 		// フォーカスしたノートの上のスペースは、ノートのスクロールに残し、スライドを移さない
@@ -241,15 +241,15 @@ test.describe('横長の画面', () => {
 		// 移ると、移った先のスライドのノートに付け替える
 		await page.keyboard.press('ArrowRight')
 		await expectCurrent(page, 2)
-		await expect(slides(page).nth(1).locator('._notes')).toHaveAttribute('tabindex', '0')
+		await expect(slides(page).nth(1).locator(':scope > aside')).toHaveAttribute('tabindex', '0')
 		await expect(notes).not.toHaveAttribute('tabindex')
-		await expect(page.locator('main.deck > section.slide > ._notes[tabindex]')).toHaveCount(1)
+		await expect(page.locator('main.deck > section.slide > aside[tabindex]')).toHaveCount(1)
 	})
 
 	test('ノートにフォーカスがあるときの Page Up / Page Down と Home / End は、スライドを移さない', async ({ page }) => {
 		await page.goto(`${DECK_PATH}#2`)
 		await page.keyboard.press('n')
-		const notes = slides(page).nth(1).locator('._notes')
+		const notes = slides(page).nth(1).locator(':scope > aside')
 		await notes.focus()
 		await page.keyboard.press('PageDown')
 		await page.keyboard.press('End')
@@ -306,9 +306,9 @@ test.describe('横長の画面', () => {
 
 	test('ノートを出すと、今のスライドのノートが見える', async ({ page }) => {
 		await page.goto(DECK_PATH)
-		await expect(slides(page).first().locator('._notes')).toBeHidden()
+		await expect(slides(page).first().locator(':scope > aside')).toBeHidden()
 		await page.keyboard.press('n')
-		await expect(slides(page).first().locator('._notes')).toBeVisible()
+		await expect(slides(page).first().locator(':scope > aside')).toBeVisible()
 	})
 
 	test('ボタンにフォーカスがあるときのスペースは、ボタンを押し、スライドを移さない', async ({ page }) => {
@@ -515,8 +515,8 @@ test.describe('縦長の画面', () => {
 
 	test('ノートは Tab の止まる場所にしない', async ({ page }) => {
 		await page.goto(DECK_PATH)
-		await expect(page.locator('main.deck > section.slide > ._notes').first()).toBeVisible()
-		await expect(page.locator('main.deck > section.slide > ._notes[tabindex]')).toHaveCount(0)
+		await expect(page.locator('main.deck > section.slide > aside').first()).toBeVisible()
+		await expect(page.locator('main.deck > section.slide > aside[tabindex]')).toHaveCount(0)
 	})
 
 	// 縦に並べる形のノートは縦長の画面でだけ出るので、幅の広い場合も高さを幅より大きくする。
@@ -525,7 +525,7 @@ test.describe('縦長の画面', () => {
 		test(`幅 ${width}px で、ノートの左右の余白がページの余白になる`, async ({ page }) => {
 			await page.setViewportSize({ width, height: width + 400 })
 			await page.goto(DECK_PATH)
-			const notes = page.locator('.slide ._notes').first()
+			const notes = page.locator('.slide > aside').first()
 			await expect(notes).toBeVisible()
 			const { start, end } = await paddingInline(notes)
 			expect(start).toBeCloseTo(expectedPageGutter(width), 0)
@@ -535,7 +535,7 @@ test.describe('縦長の画面', () => {
 
 	test('ノートに面の色と上の辺の線が付く', async ({ page }) => {
 		await page.goto(DECK_PATH)
-		const notes = page.locator('.slide ._notes').first()
+		const notes = page.locator('.slide > aside').first()
 		await expect(notes).toBeVisible()
 		const surface = await resolveBackgroundToken(page, '--background--surface')
 		const base = await resolveBackgroundToken(page, '--background--base')
@@ -592,8 +592,8 @@ test.describe('発表者ビュー', () => {
 		await expect(slides(page).nth(1)).toHaveJSProperty('inert', false)
 		await expect(page.locator('main.deck > section.slide:not([hidden])')).toHaveCount(3)
 		// ノートを読むのは今のスライドだけなので、前と次のスライドのノートは Tab の止まる場所にしない
-		await expect(slides(page).nth(1).locator('._notes')).toHaveAttribute('tabindex', '0')
-		await expect(page.locator('main.deck > section.slide > ._notes[tabindex]')).toHaveCount(1)
+		await expect(slides(page).nth(1).locator(':scope > aside')).toHaveAttribute('tabindex', '0')
+		await expect(page.locator('main.deck > section.slide > aside[tabindex]')).toHaveCount(1)
 		// 発表者ビューでは、ノートを隠すボタンと、さらに発表者ビューを開くボタンを出さない
 		await expect(controls(page).locator('[data-action="notes"]')).toBeHidden()
 		await expect(controls(page).locator('[data-action="presenter"]')).toBeHidden()
@@ -629,7 +629,7 @@ test.describe('発表者ビュー', () => {
 				if (!found) throw new Error(`${selector} の位置が取れない`)
 				return found
 			}
-			const notes = await box('.slide[data-slide="current"] > ._notes')
+			const notes = await box('.slide[data-slide="current"] > aside')
 			const band = await box('.deck-controls')
 			const frames = await Promise.all(
 				['current', 'prev', 'next'].map((name) => box(`.slide[data-slide="${name}"] > ._frame`)),
@@ -662,7 +662,7 @@ test.describe('発表者ビュー', () => {
 			await page.setViewportSize(viewport)
 			await page.goto(`${DECK_PATH}?presenter#2`)
 			await expect(deck(page)).toHaveAttribute('data-view', 'presenter')
-			const notes = page.locator('.slide[data-slide="current"] > ._notes')
+			const notes = page.locator('.slide[data-slide="current"] > aside')
 			await expect(notes).toBeVisible()
 			const { start, end } = await paddingInline(notes)
 			expect(start).toBeCloseTo(expectedPageGutter(viewport.width), 0)

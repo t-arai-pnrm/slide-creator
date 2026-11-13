@@ -81,6 +81,11 @@ const REEL = Array.from({ length: 10 }, (_, value) => value)
 		 * 1 行に入らないときは、帯をカードの下へ折り返し、間を上下左右とも 0.75rem 空ける（DESIGN.md の「タイマー」）
 		 */
 		.presenter-timer {
+			/* ボタンの状態ごとの色（state-suffix-for-custom-properties）。値は DESIGN.md の「操作の部分」 */
+			--_foreground: var(--foreground--muted);
+			--_foreground--hocus: var(--foreground--base);
+			--_foreground--disabled: var(--foreground--disabled);
+
 			display: block flex;
 			flex-wrap: wrap;
 			gap: 0.75rem;
@@ -145,7 +150,6 @@ const REEL = Array.from({ length: 10 }, (_, value) => value)
 
 		/* 1 字分の窓。帯の数字は 1 行に 1 字ずつ並ぶので、1 行の高さ（1lh）の窓に 1 字が入る。上下の端で隣の数字を切る */
 		._digit {
-			display: block flow;
 			overflow: clip;
 			block-size: 1lh;
 		}
@@ -176,7 +180,7 @@ const REEL = Array.from({ length: 10 }, (_, value) => value)
 			/* 帯の内側の余白。ボタンの角丸も、帯の角丸からこの値を引いて求める（DESIGN.md の「操作の部分」） */
 			--_band-padding: 0.25rem;
 
-			/* ボタンの間。隙間を作らず、各項目（li）の左右に半分ずつ持たせる（no-gaps-between-hover-items） */
+			/* ボタンの間。隙間は、両側のボタンが半分ずつ押せる範囲として持つ（no-gaps-between-hover-items） */
 			--_button-gap: 0.125rem;
 
 			/* 帯の中のボタンを、ポインターかキーボードのフォーカスが指しているか（hocus-via-style-query） */
@@ -190,25 +194,22 @@ const REEL = Array.from({ length: 10 }, (_, value) => value)
 
 			/* アンカーの名前が帯の外に届かないよう、範囲を帯の中に限る（anchor-scope-for-repeated-components） */
 			anchor-scope: --presenter-timer-hocus;
-
-			/* 左右は、端のボタンの項目が持つボタンの間の半分を引き、上下と同じ余白に見せる */
-			padding-block: var(--_band-padding);
-			padding-inline: calc(var(--_band-padding) - var(--_button-gap) / 2);
+			padding: var(--_band-padding);
 			border: 1px solid var(--border--base);
 			border-radius: var(--rounded--control);
 			background-color: var(--background--surface);
 
 			/*
-			 * ボタンの間の隙間の上も、その項目（li）の上として数え、ハイライトを消さない。
+			 * ボタンの間の隙間の上は、ボタンの押せる範囲（::after）に含まれるので、ボタンのホバーとして数え、ハイライトを消さない。
 			 * 無効のボタンにはハイライトを置かない
 			 */
-			&:has(> ._buttons li:hover > button:not(:disabled, [aria-disabled='true'])) {
+			&:has(> ._buttons button:enabled:not([aria-disabled='true']):hover) {
 				@media (any-hover) {
 					--_has-hocus: --true;
 				}
 			}
 
-			&:has(> ._buttons button:not(:disabled, [aria-disabled='true']):focus-visible) {
+			&:has(> ._buttons button:enabled:not([aria-disabled='true']):focus-visible) {
 				--_has-hocus: --true;
 			}
 
@@ -241,25 +242,25 @@ const REEL = Array.from({ length: 10 }, (_, value) => value)
 						transition-duration: var(--duration--base);
 						transition-property: opacity;
 						transition-timing-function: var(--ease--out-quint);
+					}
 
-						/* ボタンの間を滑らせるのは、動きを減らす設定がないときだけにする（motion-only-with-no-preference） */
-						@container style(--_has-hocus: --true) {
-							@media (prefers-reduced-motion: no-preference) {
-								transition-property: inset, opacity;
-								transition-timing-function: var(--ease--in-out-quint), var(--ease--out-quint);
-							}
-						}
-
-						/*
-						 * ポインターが帯を出たら、薄れ終わるまで最後のボタンの位置に留める。
-						 * アンカーを失った inset は auto に戻るので、離散的な切り替えを step-end で時間の終わりまで遅らせる。
-						 * allow-discrete はこの状態に入るときだけにし、帯の外から入ったときは、前の位置から滑らせずにその場に出す
-						 */
-						@container style(--_has-hocus: --false) {
+					/* ボタンの間を滑らせるのは、動きを減らす設定がないときだけにする（motion-only-with-no-preference） */
+					@container style(--_has-focus-visible: --false) and style(--_has-hocus: --true) {
+						@media (prefers-reduced-motion: no-preference) {
 							transition-property: inset, opacity;
-							transition-timing-function: step-end, var(--ease--out-quint);
-							transition-behavior: allow-discrete;
+							transition-timing-function: var(--ease--in-out-quint), var(--ease--out-quint);
 						}
+					}
+
+					/*
+					 * ポインターが帯を出たら、薄れ終わるまで最後のボタンの位置に留める。
+					 * アンカーを失った inset は auto に戻るので、離散的な切り替えを step-end で時間の終わりまで遅らせる。
+					 * allow-discrete はこの状態に入るときだけにし、帯の外から入ったときは、前の位置から滑らせずにその場に出す
+					 */
+					@container style(--_has-focus-visible: --false) and style(--_has-hocus: --false) {
+						transition-property: inset, opacity;
+						transition-timing-function: step-end, var(--ease--out-quint);
+						transition-behavior: allow-discrete;
 					}
 				}
 			}
@@ -273,14 +274,14 @@ const REEL = Array.from({ length: 10 }, (_, value) => value)
 			position: relative;
 		}
 
-		/* ボタンは数が決まっていて、帯の 1 行に収まるので、折り返さない */
+		/*
+		 * ボタンは数が決まっていて、帯の 1 行に収まるので、折り返さない。
+		 * ボタンの間の隙間は、両側のボタンの押せる範囲（::after）が半分ずつ覆うので、
+		 * ポインターが隙間を通る間もどれかのボタンの上にある（no-gaps-between-hover-items）
+		 */
 		menu {
 			display: block flex;
-		}
-
-		/* ボタンの間は、項目の左右の padding で作り、ポインターが隙間を通る間もどれかの項目の上にあるようにする（no-gaps-between-hover-items） */
-		menu > li {
-			padding-inline: calc(var(--_button-gap) / 2);
+			column-gap: var(--_button-gap);
 		}
 
 		/*
@@ -290,6 +291,13 @@ const REEL = Array.from({ length: 10 }, (_, value) => value)
 		button {
 			/* 押せる部分の大きさ。文字と一緒に大きくし、CSS ピクセルの下限も併せて書く（hit-area-min-size） */
 			--_hit-size: max(24px, 24 / 16 * 1rem);
+
+			/*
+			 * ツールチップの左右の位置。ふだんはボタンの中央にそろえる。
+			 * 動かさないので、中央に寄せる translate は描き直しの負荷にならない
+			 */
+			--_tooltip-inset-inline: 50% auto;
+			--_tooltip-translate: -50% 0;
 
 			/* ボタンを、ポインターかキーボードのフォーカスが指しているか。ツールチップが読む（hocus-via-style-query） */
 			--_is-hocus: --false;
@@ -320,19 +328,35 @@ const REEL = Array.from({ length: 10 }, (_, value) => value)
 
 			/* 帯とボタンの角が同じ中心の円弧になるよう、帯の角丸から内側の余白を引く */
 			border-radius: calc(var(--rounded--control) - var(--_band-padding));
-			color: var(--foreground--muted);
+			color: var(--_foreground);
 
 			@media (any-pointer: coarse) {
 				--_hit-size: max(44px, 44 / 16 * 1rem);
 			}
 
-			/* 押せないボタンは、ホバーで色を変えない。ツールチップの名前は、押せないボタンにも出す */
-			@media (any-hover) {
-				&:not(:disabled, [aria-disabled='true']):hover {
-					color: var(--foreground--base);
-				}
+			/*
+			 * 押せる範囲を、見た目の面を変えずに、ボタンの間の隙間まで広げる（pseudo-hit-area-no-overlap）。
+			 * 隣のボタンとは隙間の中央で接し、重ならない。ボタンの押せる範囲なので、隙間の上もボタンのホバーになる。
+			 * ハイライトとツールチップは、ボタン自身の大きさと位置に合わせるので、広げた範囲の影響を受けない
+			 */
+			&::after {
+				content: '';
+				position: absolute;
+				inset-block: 0;
+				inset-inline: calc(var(--_button-gap) / -2);
+			}
 
-				&:hover {
+			/* 押せないボタンは、ホバーで色を変えず、ハイライトも置かない */
+			&:enabled:not([aria-disabled='true']):hover {
+				@media (any-hover) {
+					anchor-name: --presenter-timer-hocus;
+					color: var(--_foreground--hocus);
+				}
+			}
+
+			/* ツールチップの名前は、押せないボタン（aria-disabled）にも出す */
+			&:enabled:hover {
+				@media (any-hover) {
 					--_is-hocus: --true;
 				}
 			}
@@ -342,7 +366,7 @@ const REEL = Array.from({ length: 10 }, (_, value) => value)
 			 * トランジションをふだんの状態に書かず、この状態に入るときにだけ効かせる。
 			 * キーボードのフォーカスでは一度に切り替える（no-motion-on-focus-visible）
 			 */
-			&:not(:disabled, [aria-disabled='true'], :focus-visible):is(:hover, :active) {
+			&:enabled:not([aria-disabled='true'], :focus-visible):is(:hover, :active) {
 				transition-duration: var(--duration--fast);
 				transition-property: color;
 				transition-timing-function: var(--ease--hover);
@@ -354,7 +378,7 @@ const REEL = Array.from({ length: 10 }, (_, value) => value)
 			}
 
 			/* 押している間は縮め、押したことを返す。ハイライトはアンカーの配置の大きさのまま残る（press-feedback-short） */
-			&:not(:disabled, [aria-disabled='true']):active {
+			&:enabled:not([aria-disabled='true']):active {
 				@media (prefers-reduced-motion: no-preference) {
 					scale: 0.97;
 				}
@@ -365,44 +389,38 @@ const REEL = Array.from({ length: 10 }, (_, value) => value)
 				--_is-focus-visible: --true;
 			}
 
-			&:not(:disabled, [aria-disabled='true']):focus-visible {
+			/* ハイライトは、ホバーしているかキーボードのフォーカスがある、押せるボタンに重ねる */
+			&:enabled:not([aria-disabled='true']):focus-visible {
 				anchor-name: --presenter-timer-hocus;
-				color: var(--foreground--base);
-			}
-
-			/* ハイライトは、ホバーしている項目か、キーボードのフォーカスがある、押せるボタンに重ねる */
-			&:not(:disabled, [aria-disabled='true']):is(menu > li:hover > *) {
-				@media (any-hover) {
-					anchor-name: --presenter-timer-hocus;
-				}
+				color: var(--_foreground--hocus);
 			}
 
 			/* 押せないことを示す見た目として、アイコンを補助の色の半分の不透明度にする（DESIGN.md の「操作の部分」） */
 			&:is(:disabled, [aria-disabled='true']) {
 				--icon--forced-color: GrayText;
 
-				color: oklch(from var(--foreground--muted) l c h / 50%);
-			}
-
-			/*
-			 * ツールチップは、ボタンの中央の下に出す。帯は画面の上の端にあるので、上ではなく下に出す。
-			 * ボタンを包含ブロックにした絶対配置で置き、アンカーポジショニングに対応しない環境でも同じ位置に出す
-			 * （no-unsupported-layout-features）。動かさないので、中央に寄せる translate は描き直しの負荷にならない
-			 */
-			& > ._tooltip {
-				position: absolute;
-				inset-block-start: calc(100% + 0.375rem);
-				inset-inline-start: 50%;
-				translate: -50% 0;
+				color: var(--_foreground--disabled);
 			}
 
 			/*
 			 * 帯の右端のボタン（停止）だけは、画面の右端からはみ出さないよう、ツールチップの右端をボタンの右端にそろえる。
 			 * 帯は横書きで並ぶので、右端は行の終わり（inline-end）になる
 			 */
-			&:is(menu > li:last-child > *) > ._tooltip {
-				inset-inline: auto 0;
-				translate: none;
+			&:is(li:last-child > *) {
+				--_tooltip-inset-inline: auto 0;
+				--_tooltip-translate: none;
+			}
+
+			/*
+			 * ツールチップは、ボタンの中央の下に出す。帯は画面の上の端にあるので、上ではなく下に出す。
+			 * ボタンを包含ブロックにした絶対配置で置き、アンカーポジショニングに対応しない環境でも同じ位置に出す
+			 * （no-unsupported-layout-features）
+			 */
+			& > ._tooltip {
+				position: absolute;
+				inset-inline: var(--_tooltip-inset-inline);
+				inset-block-start: calc(100% + 0.375rem);
+				translate: var(--_tooltip-translate);
 			}
 		}
 

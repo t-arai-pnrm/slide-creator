@@ -138,7 +138,7 @@
 	 * notes と同じく枠に比例させず rem で持ち、cqi のプリミティブを参照しない
 	 */
 	--text--control--font-family: var(--font-family--monospace);
-	--text--control--font-size: calc(14 / 16 * 1rem);
+	--text--control--font-size: 0.875rem;
 	--text--control--font-weight: var(--font-weight--regular);
 	--text--control--leading: var(--leading--normal);
 
