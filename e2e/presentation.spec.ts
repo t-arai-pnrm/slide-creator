@@ -80,6 +80,94 @@ const resolveBackgroundToken = (page: Page, token: string) =>
 		return value
 	}, token)
 
+type BandPoint = { label: string; x: number; y: number }
+
+/**
+ * ボタンの帯（band）の中で、ボタンの押せる範囲が覆うはずの点を、ボタンの位置から求める。
+ * - 組の中の隣り合うボタンの間の隙間の中央
+ * - 組の間の区切り線の上と、線とその両側のボタンの間の中央
+ * 高さは、どれもボタンの上下の中央にする。隠したボタン（発表者ビューのノートなど）は並びから外れるので数えない。
+ * 区切り線は前の組の最後の項目の ::after で、項目の行末側の padding の手前に置かれる（DeckControls.astro）。
+ * 擬似要素の位置は取れないので、項目の右端から padding と線の太さの半分を引いて、線の中央を求める
+ */
+const bandGapPoints = (band: Locator) =>
+	band.evaluate((root) => {
+		const nameOf = (button: HTMLButtonElement) => button.querySelector('.-visually-hidden')?.textContent ?? '?'
+		const visibleButtons = (menu: Element) =>
+			[...menu.querySelectorAll('button')].filter((button) => button.getClientRects().length > 0)
+		const centerY = (rect: DOMRect) => rect.top + rect.height / 2
+		const menus = [...root.querySelectorAll('menu')]
+		const points: { label: string; x: number; y: number }[] = []
+		for (const [index, menu] of menus.entries()) {
+			const buttons = visibleButtons(menu)
+			for (const [i, before] of buttons.entries()) {
+				const after = buttons[i + 1]
+				if (!after) continue
+				const a = before.getBoundingClientRect()
+				const b = after.getBoundingClientRect()
+				points.push({ label: `${nameOf(before)}と${nameOf(after)}の間`, x: (a.right + b.left) / 2, y: centerY(a) })
+			}
+			const nextMenu = menus[index + 1]
+			const last = buttons.at(-1)
+			const first = nextMenu ? visibleButtons(nextMenu)[0] : undefined
+			const item = last?.closest('li')
+			if (!last || !first || !item) continue
+			const a = last.getBoundingClientRect()
+			const b = first.getBoundingClientRect()
+			const separatorWidth = Number.parseFloat(getComputedStyle(item, '::after').borderLeftWidth)
+			const separatorX =
+				item.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(item).paddingRight) - separatorWidth / 2
+			const y = centerY(a)
+			points.push(
+				{ label: `${nameOf(last)}と区切り線の間`, x: (a.right + separatorX) / 2, y },
+				{ label: '区切り線の上', x: separatorX, y },
+				{ label: `区切り線と${nameOf(first)}の間`, x: (separatorX + b.left) / 2, y },
+			)
+		}
+		return points
+	})
+
+/**
+ * 点 point にポインターを動かし、その点が帯（band）の中のボタンの押せる範囲に当たることを確かめる。
+ * 当たったボタンのツールチップが出て、押せるボタンなら帯のハイライト（::before）も出ていることを確かめる。
+ * 押せないボタン（aria-disabled）にはハイライトを置かないので、ツールチップだけを確かめる
+ */
+const expectHoverOnBandPoint = async (page: Page, band: Locator, point: BandPoint) => {
+	await page.mouse.move(point.x, point.y)
+	// 操作の部分は、隠れている間（data-idle）はポインターを下のスライドに通すので、現れてから当たりを調べる
+	await expect(controls(page)).not.toHaveAttribute('data-idle')
+	const hit = await band.evaluate((root, { x, y }) => {
+		const element = document.elementFromPoint(x, y)
+		// 押せる範囲の ::after の上では、ボタン自身が返る
+		const button = element?.closest('button')
+		const buttons = [...root.querySelectorAll('button')]
+		return {
+			index: button ? buttons.indexOf(button) : -1,
+			isDisabled: button?.getAttribute('aria-disabled') === 'true',
+			found: element ? `${element.tagName.toLowerCase()}.${element.className}` : 'なし',
+		}
+	}, point)
+	expect(hit.index, `${point.label}（${point.x}, ${point.y}）で当たった要素: ${hit.found}`).toBeGreaterThanOrEqual(0)
+	await expect(band.locator('button').nth(hit.index).locator('._tooltip'), point.label).toHaveCSS('opacity', '1')
+	if (!hit.isDisabled) {
+		await expect
+			.poll(() => band.evaluate((element) => getComputedStyle(element, '::before').opacity), { message: point.label })
+			.toBe('1')
+	}
+}
+
+/** 帯（band）の、ボタンの間の隙間と区切り線のまわりのすべての点で、ハイライトとツールチップが消えないことを確かめる */
+const expectHoverAcrossBandGaps = async (page: Page, band: Locator) => {
+	const points = await bandGapPoints(band)
+	expect(points.length).toBeGreaterThan(0)
+	for (const point of points) {
+		// 前の点のホバーが移るのを待ってから、次の点に動かす
+		// oxlint-disable-next-line no-await-in-loop
+		await expectHoverOnBandPoint(page, band, point)
+	}
+	return points
+}
+
 test.describe('横長の画面', () => {
 	test.use({ viewport: LANDSCAPE })
 
@@ -409,6 +497,18 @@ test.describe('横長の画面', () => {
 		expect(content).toMatch(/^""/)
 		// 矢印キーはスライドの移動に使うので、帯をツールバーにしない
 		await expect(controls(page).getByRole('toolbar')).toHaveCount(0)
+	})
+
+	test('ボタンの間の隙間と組の間の区切り線の上でも、どれかのボタンに当たり、ハイライトとツールチップが消えない', async ({
+		page,
+	}) => {
+		// 1 枚目では前へが押せず、ハイライトを置かないので、両端のボタンがどちらも押せる 2 枚目で試す
+		await page.goto(`${DECK_PATH}#2`)
+		// 操作の部分は、ポインターが動かないと隠れて押せなくなるので、先に動かして出しておく
+		await page.mouse.move(LANDSCAPE.width / 2, LANDSCAPE.height / 2)
+		await expect(controls(page)).not.toHaveAttribute('data-idle')
+		const points = await expectHoverAcrossBandGaps(page, controls(page))
+		expect(points.map(({ label }) => label)).toContain('区切り線の上')
 	})
 
 	test('全画面に対応していれば全画面のボタンを出し、対応していなければ出さない', async ({ page }) => {
@@ -770,6 +870,22 @@ test.describe('発表者ビュー', () => {
 				await expect(button.locator('svg')).toHaveAttribute('aria-hidden', 'true')
 			}),
 		)
+	})
+
+	test('操作の部分とタイマーのボタンの間の隙間と区切り線の上でも、どれかのボタンに当たり、ハイライトとツールチップが消えない', async ({
+		page,
+	}) => {
+		await page.goto(`${DECK_PATH}?presenter#2`)
+		await expect(deck(page)).toHaveAttribute('data-view', 'presenter')
+		await page.mouse.move(LANDSCAPE.width / 2, LANDSCAPE.height / 2)
+		await expect(controls(page)).not.toHaveAttribute('data-idle')
+		const points = await expectHoverAcrossBandGaps(page, controls(page))
+		expect(points.map(({ label }) => label)).toContain('区切り線の上')
+
+		// 止まっている間は一時停止と停止が押せず、ハイライトを確かめられないので、再生して 2 つを押せる状態にする
+		await timerButton(page, '再生').click()
+		await expect(timerButton(page, '停止')).toHaveAttribute('aria-disabled', 'false')
+		await expectHoverAcrossBandGaps(page, page.locator('.presenter-timer ._controls'))
 	})
 
 	test('99 分を超えると、見える数字は 99:59 で止め、読み上げは実際の時間を伝える', async ({ page }) => {

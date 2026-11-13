@@ -306,7 +306,14 @@ import Icon from '@/components/Icon.astro'
 			/* 押せる部分の大きさ。文字と一緒に大きくし、CSS ピクセルの下限も併せて書く（hit-area-min-size） */
 			--_hit-size: max(24px, 24 / 16 * 1rem);
 
-			/* 押せる範囲（::after）を、ボタンの外の行末側へ広げる幅。ふだんは、行頭側と同じくボタンの間の半分 */
+			/*
+			 * 枠線の太さ。押せる範囲（::after）はパディングボックスから測るので、広げる幅に足す。
+			 * 足さないと、::after の端が枠線の外側の辺で止まり、隙間が覆われない
+			 */
+			--_border-width: 1px;
+
+			/* 押せる範囲（::after）を、ボタンの外の行頭側と行末側へ広げる幅。ふだんは、どちらもボタンの間の半分 */
+			--_hit-extend-inline-start: calc(var(--_button-gap) / 2);
 			--_hit-extend-inline-end: calc(var(--_button-gap) / 2);
 
 			/*
@@ -341,6 +348,7 @@ import Icon from '@/components/Icon.astro'
 			aspect-ratio: 1;
 
 			/* 強制カラーモードでは線が見えるよう、none ではなく透明にする（色はルートの --_border-color） */
+			border-width: var(--_border-width);
 			border-color: var(--_border-color);
 
 			/* 帯とボタンの角が同じ中心の円弧になるよう、帯の角丸から内側の余白を引く */
@@ -360,12 +368,15 @@ import Icon from '@/components/Icon.astro'
 				content: '';
 				position: absolute;
 				inset-block: 0;
-				inset-inline: calc(var(--_button-gap) / -2) calc(var(--_hit-extend-inline-end) * -1);
+				inset-inline: calc((var(--_border-width) + var(--_hit-extend-inline-start)) * -1)
+					calc((var(--_border-width) + var(--_hit-extend-inline-end)) * -1);
 			}
 
 			/*
 			 * 前の組の最後のボタン（次へ）は、組の間の線の両側の間と線の上まで押せる範囲を広げ、
-			 * ポインターが線の上を通ってもハイライトを消さない。後ろの組の最初のボタンが広げるボタンの間の半分とは重ねない
+			 * ポインターが線の上を通ってもハイライトを消さない。
+			 * 後ろの組の最初に見えるボタンは、発表者ビューでノートを隠すと替わるので、どのボタンでも同じ行頭側の幅（ボタンの間の半分）のままにし、
+			 * 次へがその残りを持つ。両方とも枠線の太さを足して測るので、2 つの範囲は重ならずに接する
 			 */
 			&:is(menu:has(+ menu) > li:last-child > *) {
 				--_hit-extend-inline-end: calc(var(--_band-padding) * 2 + var(--_separator-width) - var(--_button-gap) / 2);

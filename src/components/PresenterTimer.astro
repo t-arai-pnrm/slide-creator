@@ -293,6 +293,12 @@ const REEL = Array.from({ length: 10 }, (_, value) => value)
 			--_hit-size: max(24px, 24 / 16 * 1rem);
 
 			/*
+			 * 枠線の太さ。押せる範囲（::after）はパディングボックスから測るので、広げる幅に足す。
+			 * 足さないと、::after の端が枠線の外側の辺で止まり、隙間が覆われない
+			 */
+			--_border-width: 1px;
+
+			/*
 			 * ツールチップの左右の位置。ふだんはボタンの中央にそろえる。
 			 * 動かさないので、中央に寄せる translate は描き直しの負荷にならない
 			 */
@@ -324,6 +330,7 @@ const REEL = Array.from({ length: 10 }, (_, value) => value)
 			aspect-ratio: 1;
 
 			/* 強制カラーモードで線が見えるよう、none ではなく透明にする */
+			border-width: var(--_border-width);
 			border-color: transparent;
 
 			/* 帯とボタンの角が同じ中心の円弧になるよう、帯の角丸から内側の余白を引く */
@@ -343,7 +350,7 @@ const REEL = Array.from({ length: 10 }, (_, value) => value)
 				content: '';
 				position: absolute;
 				inset-block: 0;
-				inset-inline: calc(var(--_button-gap) / -2);
+				inset-inline: calc((var(--_border-width) + var(--_button-gap) / 2) * -1);
 			}
 
 			/* 押せないボタンは、ホバーで色を変えず、ハイライトも置かない */

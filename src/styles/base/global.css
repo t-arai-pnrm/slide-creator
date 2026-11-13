@@ -43,6 +43,10 @@
 	line-height: var(--text--body--leading);
 	text-underline-offset: 25%;
 
+	/*
+	 * キーワードの大きさ（auto など）へのトランジションは今はないが、ベーススタイルとして先に許しておく。
+	 * 動きを減らす設定では、大きさを一度に切り替える（interpolate-size-in-base）
+	 */
 	@media (prefers-reduced-motion: no-preference) {
 		interpolate-size: allow-keywords;
 	}
