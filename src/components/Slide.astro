@@ -89,12 +89,15 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			--_body-align-self: auto;
 			--_body-max-inline-size: none;
 
-			/* 表紙、章の扉、最後の配置（DESIGN.md の「レイアウトの一覧」） */
+			/*
+			 * 表紙、章の扉、最後の配置（DESIGN.md の「レイアウトの一覧」）。
+			 * 題名が主役で本文がほとんどなく、上から詰めると枠の下半分が空いて見えるため、題名を下寄りに置く
+			 */
 			&:is([data-layout='cover'], [data-layout='section'], [data-layout='end']) {
 				--_frame-inner-grid-template: '.' 1fr '--heading' '--body' '--page' / 1fr;
 			}
 
-			/* 表紙、章の扉、主張、最後は、題名を display のスタイルにする（DESIGN.md の「レイアウトの一覧」） */
+			/* 表紙、章の扉、最後の題名と、主張のキーメッセージの文字のスタイル（DESIGN.md の「レイアウトの一覧」と「文字のスタイル」） */
 			&:is([data-layout='cover'], [data-layout='section'], [data-layout='statement'], [data-layout='end']) {
 				--_title-font-size: var(--text--display--font-size);
 				--_title-leading: var(--text--display--leading);
@@ -122,7 +125,7 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			}
 
 			/*
-			 * 主張は、キーメッセージを枠の中ほどに置き、補足を下に小さく添える。
+			 * 主張の配置（DESIGN.md の「レイアウトの一覧」）。1 つの結論を見せるスライドなので、上に寄せない。
 			 * 補足の幅の上限は、DESIGN.md の「レイアウトの一覧」の、レイアウトごとの幅の上限
 			 */
 			&[data-layout='statement'] {
@@ -130,7 +133,7 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 				--_body-max-inline-size: 70cqi;
 			}
 
-			/* 数値の配置（DESIGN.md の「レイアウトの一覧」） */
+			/* 数値の配置（DESIGN.md の「レイアウトの一覧」）。大きな数字を題名から離し、詰まって見えないようにする */
 			&[data-layout='number'] {
 				--_body-align-self: end;
 			}
@@ -466,7 +469,7 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			/*
 			 * 発表の表示でノートを出したときと発表者ビューでは、画面の向きにかかわらず出す。
 			 * 枠の下か横に別の領域として置く。
-			 * 下の 3 割の領域に収まらない長さのノートは、領域の中でスクロールさせる
+			 * ノートの領域に収まらない長さのノートは、領域の中でスクロールさせる
 			 */
 			&:is(:global(.deck[data-notes='shown']) *) {
 				@media screen {
