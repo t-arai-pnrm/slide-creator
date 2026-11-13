@@ -8,7 +8,7 @@
  *
  * @prop {length} [--slide--stage-block-size=100svb] 枠を収める高さ。枠の幅の上限を、この高さと 16:9 の比から決める。
  *   発表者ビューでは、置く側のデッキが、枠を置くグリッドの行の高さを渡す
- * @prop {length} [--slide--stack-end-space=env(safe-area-inset-bottom)] 縦に並べる形の最後のスライドの下に空ける長さ。
+ * @prop {length} [--slide--stack-end-space=max(0px, env(safe-area-inset-bottom))] 縦に並べる形の最後のスライドの下に空ける長さ。
  *   画面の下の端から、セーフエリアと、画面に固定して置いたものが覆う高さ。
  *   置く側のデッキが、操作の部分を画面の下に固定するとき、セーフエリアを含めた帯の上端までの長さを渡す
  */
