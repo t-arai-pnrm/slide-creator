@@ -1,13 +1,16 @@
 ---
 /**
- * 1 枚のスライド。16:9 の枠（._frame）と、その下のスピーカーノート（._notes）からなる。
+ * 1 枚のスライド。16:9 の枠（._frame）と、その下のスピーカーノート（aside）からなる。
  * ノートの出し分け（縦長の画面で出し、横長の画面で隠す）は CSS で行う。
  * 発表の表示でノートを出したとき（下の 3 割をノートの領域にする）と、発表者ビュー（枠とノートをデッキのグリッドに置く）の
  * 見た目は、デッキのルートの data-view と data-notes を祖先の状態として読み、この中に書く。
- * ノートの slot を渡さないスライドでは、空の領域と中身のないランドマークを出さないよう、._notes を出力しない。
+ * ノートの slot を渡さないスライドでは、空の領域と中身のないランドマークを出さないよう、ノートの aside を出力しない。
  *
  * @prop {length} [--slide--stage-block-size=100svb] 枠を収める高さ。枠の幅の上限を、この高さと 16:9 の比から決める。
  *   発表者ビューでは、置く側のデッキが、枠を置くグリッドの行の高さを渡す
+ * @prop {length} [--slide--stack-end-space=max(0px, env(safe-area-inset-bottom))] 縦に並べる形の最後のスライドの下に空ける長さ。
+ *   画面の下の端から、セーフエリアと、画面に固定して置いたものが覆う高さ。
+ *   置く側のデッキが、操作の部分を画面の下に固定するとき、セーフエリアを含めた帯の上端までの長さを渡す
  */
 interface Props {
 	/** 1 から数えたページ番号。デッキの中で重ならないので、題名の id にも使う */
@@ -41,7 +44,7 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 <section class="slide" aria-labelledby={titleId} data-layout={layout}>
 	<div class="_frame">
 		<div class="_frame-inner">
-			<hgroup class="_heading">
+			<hgroup>
 				{chapter && <p class="_chapter">{chapter}</p>}
 				<h2 class="_title" id={titleId}><slot name="title" /></h2>
 			</hgroup>
@@ -51,7 +54,7 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			<p class="_page">{page} / {total}</p>
 		</div>
 	</div>
-	{hasNotes && <aside class="_notes" aria-label={notesLabel}><slot name="notes" /></aside>}
+	{hasNotes && <aside aria-label={notesLabel}><slot name="notes" /></aside>}
 </section>
 
 <style>
@@ -62,14 +65,87 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 		 * （is-for-ancestor-context）。デッキの CSS からは、このコンポーネントのルートの配置だけを決める
 		 */
 		.slide {
-			/* 発表の表示でノートを出したとき、画面の下の 3 割をノートの領域にする（DESIGN.md の「枠」） */
-			--_notes-share: 0.3;
+			/*
+			 * 発表の表示でノートを出したときの、ノートの領域の割合。枠の位置を求める Deck.astro と同じ値にするため、
+			 * トークンから受ける（share-look-with-tokens。DESIGN.md の「枠」）
+			 */
+			--_notes-share: var(--ratio--notes);
 
 			/* 枠を収める高さ。ふだんは画面の高さで、ノートの領域を取ったときはその残り */
 			--_stage-block-size: var(--slide--stage-block-size, 100svb);
 
+			/*
+			 * 縦に並べる形の最後のスライドの下に空ける長さ。ふだんはセーフエリアの分で、いつもの余白は 0 なので比べる
+			 * （safe-area-combine-with-max）。置く側が画面の下に固定したものの分を渡すときは、セーフエリアを含めた長さを受ける
+			 */
+			--_stack-end-space: var(--slide--stack-end-space, max(0px, env(safe-area-inset-bottom)));
+
 			/* スライドが替わったときに要素を順に出す間隔（DESIGN.md の「動かしてよい場面」） */
 			--_stagger: var(--duration--stagger);
+
+			/*
+			 * レイアウト（data-layout）で値だけが変わる宣言は、ここで内部プロパティとして宣言し直し、
+			 * 子のルールは読むだけにする。子のセレクタにレイアウトの条件を足すと、詳細度が上がるため（state-suffix-for-custom-properties）
+			 */
+			--_frame-inner-grid-template: '--heading' '--body' 1fr '--page' / 1fr;
+			--_heading-max-inline-size: none;
+			--_heading-padding-block-start: 0;
+			--_heading-padding-block-end: 0;
+			--_heading-border-block-start: none;
+			--_heading-rule-width: var(--line-width--thin);
+			--_title-font-size: var(--text--title--font-size);
+			--_title-leading: var(--text--title--leading);
+			--_body-align-self: auto;
+			--_body-max-inline-size: none;
+
+			/*
+			 * 表紙、章の扉、最後の配置（DESIGN.md の「レイアウトの一覧」）。
+			 * 題名が主役で本文がほとんどなく、上から詰めると枠の下半分が空いて見えるため、題名を下寄りに置く
+			 */
+			&:is([data-layout='cover'], [data-layout='section'], [data-layout='end']) {
+				--_frame-inner-grid-template: '.' 1fr '--heading' '--body' '--page' / 1fr;
+			}
+
+			/* 表紙、章の扉、最後の題名と、主張のキーメッセージの文字のスタイル（DESIGN.md の「レイアウトの一覧」と「文字のスタイル」） */
+			&:is([data-layout='cover'], [data-layout='section'], [data-layout='statement'], [data-layout='end']) {
+				--_title-font-size: var(--text--display--font-size);
+				--_title-leading: var(--text--display--leading);
+			}
+
+			/*
+			 * 表紙と最後は、題名の上にアクセントの太い線を引く。アクセントはこの 1 か所だけにする。
+			 * 題名の幅の上限は、DESIGN.md の「レイアウトの一覧」の、レイアウトごとの幅の上限。
+			 * 表紙と最後には題名の下の線がないので、本文（発表者の名前など）との間を、
+			 * ふつうのスライドが題名の下の線の上に空ける spacing--sm の分だけ広げ、ほかのスライドとそろえる。
+			 * row-gap はすべての行の間に同じ値が入り、この間だけを広げられないので、広げる分は題名の側（hgroup）の
+			 * 下の内側の余白で取る。本文の側の margin にしないのは、間隔を兄弟の間の余白として子に持たせないため
+			 * （gap-over-child-margin、block-margin-with-sibling-combinator）
+			 */
+			&:is([data-layout='cover'], [data-layout='end']) {
+				--_heading-max-inline-size: 75cqi;
+				--_heading-padding-block-start: var(--spacing--md);
+				--_heading-padding-block-end: var(--spacing--sm);
+				--_heading-border-block-start: var(--line-width--thick) solid var(--accent--base);
+			}
+
+			/* 章の扉の太い罫線（DESIGN.md の「レイアウトの一覧」） */
+			&[data-layout='section'] {
+				--_heading-rule-width: var(--line-width--thick);
+			}
+
+			/*
+			 * 主張の配置（DESIGN.md の「レイアウトの一覧」）。1 つの結論を見せるスライドなので、上に寄せない。
+			 * 補足の幅の上限は、DESIGN.md の「レイアウトの一覧」の、レイアウトごとの幅の上限
+			 */
+			&[data-layout='statement'] {
+				--_frame-inner-grid-template: '.' 1fr '--heading' '--body' '.' 1fr '--page' / 1fr;
+				--_body-max-inline-size: 70cqi;
+			}
+
+			/* 数値の配置（DESIGN.md の「レイアウトの一覧」）。大きな数字を題名から離し、詰まって見えないようにする */
+			&[data-layout='number'] {
+				--_body-align-self: end;
+			}
 
 			/*
 			 * 上の残りの高さに枠を、下にノートの領域を置く。枠は上の領域の中で上下の中央に置く。
@@ -97,6 +173,30 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 				grid-template: subgrid / subgrid;
 			}
 
+			/*
+			 * 縦に並べる形の最後のスライドは、画面の下の端から --_stack-end-space の分だけ空ける（DESIGN.md の「画面の端」）。
+			 * ノートが出ていれば、面を端まで塗るためノートの内側の余白で空ける（下の aside）ので、ノートが出ていないときだけここで空ける。
+			 * ノートが出ていないのは、ノートの要素がないとき、ノートを隠す横長の画面（JavaScript が動かず縦に並べる形のまま）、
+			 * 操作の部分のノートのボタンでノートを隠したとき（data-notes='hidden'）。
+			 * JavaScript が動かないときは data-notes がないので、横長の画面でノートを隠す条件は aside の @media だけで決まる。
+			 * そのため、横長の画面の条件（aspect-ratio >= 1）は、aside の @media のノートを隠す条件とそろえる。片方を変えたら、もう片方も変える。
+			 * 印刷ではセーフエリアが 0 で、足しても値が変わらないので、条件に含めない。
+			 * ネストを 2 層までにするため、ノートを隠す 3 つの場合を、別の規則に分ける（nesting-depth-one）
+			 */
+			&:is(:global(.deck:not([data-view])) > *):last-child {
+				@media (aspect-ratio >= 1) {
+					padding-block-end: var(--_stack-end-space);
+				}
+			}
+
+			&:is(:global(.deck:not([data-view])) > *):last-child:not(:has(> aside)) {
+				padding-block-end: var(--_stack-end-space);
+			}
+
+			&:is(:global(.deck:not([data-view])[data-notes='hidden']) > *):last-child {
+				padding-block-end: var(--_stack-end-space);
+			}
+
 			/* DESIGN.md の「枠」のとおり、枠を中央に置く */
 			& > ._frame {
 				grid-area: --frame;
@@ -104,7 +204,7 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			}
 
 			/* 上で枠を上下の中央に置く align-items: center を、ノートの領域には当てず、領域の高さいっぱいに広げる */
-			& > ._notes {
+			& > aside {
 				grid-area: --notes;
 				align-self: stretch;
 			}
@@ -113,16 +213,16 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 				@media print {
 					break-before: page;
 				}
+			}
 
-				/*
+			/*
 			 * 枠の面と枠の外が同じ色なので、線がないとスライドの境目が見えない。
 			 * 発表の表示と発表者ビューでは、hidden で隠したスライドも兄弟に数えるので、
 			 * 縦に並べる形（data-view がない）に限る
 			 */
-				&:is(:global(.deck:not([data-view])) > *) {
-					@media screen {
-						border-block-start: 1px solid var(--border--base);
-					}
+			& + &:is(:global(.deck:not([data-view])) > *) {
+				@media screen {
+					border-block-start: 1px solid var(--border--base);
 				}
 			}
 		}
@@ -134,7 +234,7 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 		 * （no-padding-on-container）
 		 */
 		._frame {
-			--_ratio: 16 / 9;
+			--_ratio: var(--aspect-ratio--frame);
 
 			container: --frame / inline-size;
 
@@ -186,44 +286,18 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 		._frame-inner {
 			display: block grid;
 			reading-flow: grid-rows;
-			grid-template:
-				'--heading'
-				'--body' 1fr
-				'--page'
-				/ 1fr;
+			grid-template: var(--_frame-inner-grid-template);
 			row-gap: var(--spacing--md);
 			padding-block: var(--guide--block);
 			padding-inline: var(--guide--inline);
 
-			/* 表紙、章の扉、最後は、題名を枠の下寄りに置き、上を空ける */
-			&:is(.slide:is([data-layout='cover'], [data-layout='section'], [data-layout='end']) *) {
-				reading-flow: grid-rows;
-				grid-template:
-					'.' 1fr
-					'--heading'
-					'--body'
-					'--page'
-					/ 1fr;
-			}
-
-			/* 主張は、キーメッセージを枠の中ほどに置き、補足を下に小さく添える */
-			&:is(.slide[data-layout='statement'] *) {
-				reading-flow: grid-rows;
-				grid-template:
-					'.' 1fr
-					'--heading'
-					'--body'
-					'.' 1fr
-					'--page'
-					/ 1fr;
-			}
-
-			& > ._heading {
+			& > hgroup {
 				grid-area: --heading;
 			}
 
 			& > ._body {
 				grid-area: --body;
+				align-self: var(--_body-align-self);
 
 				/*
 				 * 本文の行（1fr）は、中身の高さを最小の大きさとして伸び、ページ番号を枠線の外へ押し出す。
@@ -238,7 +312,11 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			}
 		}
 
-		._heading {
+		hgroup {
+			max-inline-size: var(--_heading-max-inline-size);
+			padding-block: var(--_heading-padding-block-start) var(--_heading-padding-block-end);
+			border-block-start: var(--_heading-border-block-start);
+
 			/*
 			 * 発表の表示でスライドが替わったら、題名を出し、その 1 つ後に、題名の下の線と本文の要素を同時に出し始める
 			 * （DESIGN.md の「動かしてよい場面」）。
@@ -261,19 +339,10 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			}
 
 			/*
-			 * 表紙と最後は、題名の上にアクセントの太い線を引く。アクセントはこの 1 か所だけにする。
-			 * 題名の幅の上限は、DESIGN.md の「レイアウトの一覧」の、レイアウトごとの幅の上限
-			 */
-			&:is(.slide:is([data-layout='cover'], [data-layout='end']) *) {
-				max-inline-size: 75cqi;
-				padding-block-start: var(--spacing--md);
-				border-block-start: var(--line-width--thick) solid var(--accent--base);
-			}
-
-			/*
 			 * ふつうのスライドは、題名の下に細い線を引いて、本文と分ける。
 			 * 切り替えのときに左から伸ばす（下のアニメーション）ため、枠線ではなく疑似要素で描く。
-			 * 強制カラーモードでも見えるよう、面ではなく線で描く
+			 * 強制カラーモードでも見えるよう、面ではなく線で描く。
+			 * 線を引くかどうかは値では表せない（疑似要素を作るかどうかの違い）ので、レイアウトの条件をここに書く
 			 */
 			&:is(
 					.slide:is(:not([data-layout]), [data-layout='quote'], [data-layout='number'], [data-layout='section']) *
@@ -281,12 +350,7 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 				content: '';
 				display: block flow;
 				margin-block-start: var(--spacing--sm);
-				border-block-start: var(--line-width--thin) solid var(--border--strong);
-			}
-
-			/* 章の扉は、題名の下に太い線を引く。上の指定より後に書いて勝たせる */
-			&:is(.slide[data-layout='section'] *)::after {
-				border-block-start-width: var(--line-width--thick);
+				border-block-start: var(--_heading-rule-width) solid var(--border--strong);
 			}
 
 			/*
@@ -332,39 +396,17 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 
 		._title {
 			font-family: var(--text--title--font-family);
-			font-size: var(--text--title--font-size);
+			font-size: var(--_title-font-size);
 			font-weight: var(--text--title--font-weight);
-			line-height: var(--text--title--leading);
-
-			/* 表紙、章の扉、主張は display のスタイルにする（DESIGN.md の「レイアウトの一覧」） */
-			&:is(
-				.slide:is([data-layout='cover'], [data-layout='section'], [data-layout='statement'], [data-layout='end']) *
-			) {
-				font-size: var(--text--display--font-size);
-				line-height: var(--text--display--leading);
-			}
+			line-height: var(--_title-leading);
 		}
 
 		._body {
+			max-inline-size: var(--_body-max-inline-size);
 			font-family: var(--text--body--font-family);
 			font-size: var(--text--body--font-size);
 			font-weight: var(--text--body--font-weight);
 			line-height: var(--text--body--leading);
-
-			/* 表紙と最後の発表者の名前は、本文の下に、枠線の右下の角に寄せず左端にそろえる */
-			&:is(.slide:is([data-layout='cover'], [data-layout='end']) *) {
-				margin-block-start: var(--spacing--sm);
-			}
-
-			/* 数値は、数字を本文の領域の下寄りに大きく置く */
-			&:is(.slide[data-layout='number'] *) {
-				align-self: end;
-			}
-
-			/* 主張の補足の幅の上限は、DESIGN.md の「レイアウトの一覧」の、レイアウトごとの幅の上限 */
-			&:is(.slide[data-layout='statement'] *) {
-				max-inline-size: 70cqi;
-			}
 
 			/* 本文は原稿のスロットから入り、クラスを付けられないので、直下の子を選ぶ */
 			& > :global(* + *) {
@@ -372,7 +414,7 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			}
 		}
 
-		/* 本文の要素は、題名の 1 つ後に、題名の下の線と同時に出す（._heading の動きと同じ条件） */
+		/* 本文の要素は、題名の 1 つ後に、題名の下の線と同時に出す（hgroup の動きと同じ条件） */
 		._body > :global(*) {
 			&:is(:global(.deck[data-view='present']) > .slide[data-slide='current'] *) {
 				--translate-from--y-value: var(--distance--enter);
@@ -407,13 +449,17 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 		}
 
 		/*
-		 * ノートは枠の外にあり、cqi が画面の幅で計算されるので、rem で書く。
+		 * ノートは枠の外にあり、cqi が画面の幅で計算されるので、枠の中の長さを使わない。
+		 * 上下の余白は文字と一緒に変わるよう rem で、左右の余白はページの余白（画面の幅で変わる px）で書く。
+		 * 面と上の辺の線は、どの表示でも付け、スライドとノートの境目を同じ見た目で示す（DESIGN.md の「枠」）。
 		 * 横長の画面では枠が画面を占めるので隠し、縦長の画面でだけ枠の下に出す。
 		 * 縦長かどうかは、幅と高さを比べる aspect-ratio で調べる（no-orientation-for-layout）
 		 */
-		._notes {
+		aside {
 			padding-block: 1.5rem;
-			padding-inline: 1rem;
+			padding-inline: var(--gutter--page-start) var(--gutter--page-end);
+			border-block-start: 1px solid var(--border--base);
+			background-color: var(--background--surface);
 			font-family: var(--text--notes--font-family);
 			font-size: var(--text--notes--font-size);
 			font-weight: var(--text--notes--font-weight);
@@ -435,19 +481,52 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 
 			/*
 			 * 発表の表示でノートを出したときと発表者ビューでは、画面の向きにかかわらず出す。
-			 * 枠の下か横に別の領域として置くので、面と上の辺の線で枠と区切る。
-			 * 下の 3 割の領域に収まらない長さのノートは、領域の中でスクロールさせる
+			 * 枠の下か横に別の領域として置く。
+			 * ノートの領域に収まらない長さのノートは、領域の中でスクロールさせる。
+			 * 縦に並べる形の data-notes='shown' は、縦長の画面のノートの初期値で、この指定は要らないので、data-view で除く。
+			 * 除く条件は :where() に入れ、詳細度を上げない。下の、発表者ビューの前と次のスライドのノートを隠す規則が、
+			 * 詳細度ではなく書く順で、この規則に勝つため（order-by-layer-not-specificity）
 			 */
-			&:is(:global(.deck[data-notes='shown']) *) {
+			&:is(:global(.deck[data-notes='shown']:where([data-view])) *) {
 				@media screen {
 					display: block flow;
 					overflow-y: auto;
-					border-block-start: 1px solid var(--border--base);
-					background-color: var(--background--surface);
 				}
 			}
 
-			/* 発表者ビューの前と次のスライドは、枠だけを見せる。上の指定より後に書いて勝たせる */
+			/*
+			 * 縦に並べる形で、操作の部分のノートのボタンでノートを隠したとき（DESIGN.md の「枠」）。
+			 * data-notes がないとき（JavaScript が動かない）は出したままにする
+			 */
+			&:is(:global(.deck:not([data-view])[data-notes='hidden']) *) {
+				display: none;
+			}
+
+			/*
+			 * 画面の下の端に接する表示（発表の表示でノートを出したときと、縦に並べる形の最後のスライド）では、
+			 * 面を画面の端まで塗り、文字だけをセーフエリアの内側に寄せる（safe-area-background-to-edge、safe-area-combine-with-max）。
+			 * 縦に並べる形の最後のスライドでは、セーフエリアの代わりに、画面に固定したものの分を含む --_stack-end-space と比べる
+			 */
+			&:is(:global(.deck[data-view='present']) *) {
+				padding-block-end: max(1.5rem, env(safe-area-inset-bottom));
+			}
+
+			&:is(:global(.deck:not([data-view])) > .slide:last-child *) {
+				padding-block-end: max(1.5rem, var(--_stack-end-space));
+			}
+
+			/*
+			 * 発表者ビューでは、画面の端からの余白とセーフエリアを、置く側の body の内側の余白で取る（Deck.astro）。
+			 * ノートでもセーフエリアと比べると、右の端で二重に空くので、いつものページの余白にする
+			 */
+			&:is(:global(.deck[data-view='presenter']) *) {
+				padding-inline: var(--gutter--page);
+			}
+
+			/*
+			 * 発表者ビューの前と次のスライドは、枠だけを見せる。上のノートを出す規則より後に書いて勝たせる。
+			 * 詳細度は上のノートを出す規則と同じなので、上の規則のセレクタに条件を足すときは、:where() に入れて詳細度を上げない
+			 */
 			&:is(.slide:is([data-slide='prev'], [data-slide='next']) *) {
 				display: none;
 			}

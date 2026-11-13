@@ -9,7 +9,8 @@
  * スライドの中の文字の大きさ、余白、線の太さはここで当てない。cqi のトークンを
  * ここで当てると、枠の外の画面の幅で長さに計算され、その長さのまま
  * 子に継承されるため。枠の中の要素で当てる。
- * 例外は、:root の文字の大きさ（rem の基準）だけにする（下の :root）。
+ * 例外は、:root の文字の大きさ（rem の基準）と、本文の中のコードの角丸にする。
+ * 角丸は継承しないので、最も近いコンテナ（スライドの中では枠）で解決される。
  * line-break: strict、text-autospace、overflow-wrap は、
  * kiso.css が :root に指定しているので、ここでは書き足さない
  * （reset-japanese-defaults-on-root）。
@@ -33,12 +34,22 @@
 	/*
 	 * rem の基準を画面の幅に比例させ、rem で決めたスライドの外（ノート、操作の部分、ツールチップ、タイマー）を、
 	 * 狭い画面でまとめて縮める。幅が 1280px 以上では 16px のままにし、11px で止める（DESIGN.md の「文字のスタイル」）。
+	 * 変わる区間（880px〜1280px）は、共通の区間（--fluid--*、375px〜1280px）とそろえない（shared-fluid-range）。
+	 * ルートの文字の大きさは、操作の部分とノートを狭い画面で縮めるために 11px〜16px、1.25svi と決めた値で、ページの余白とは別に決めているため。
 	 * ブラウザの文字の大きさの設定には追従させないと決めている（no-root-font-size-change、verify-text-resize-200 と違う点）
 	 */
 	/* stylelint-disable-next-line rule-selector-property-disallowed-list, declaration-property-value-disallowed-list -- DESIGN.md で 11px と 16px に決め、ブラウザの文字の大きさの設定に追従させないため（上のコメント） */
 	font-size: clamp(11px, 1.25svi, 16px);
 	line-height: var(--text--body--leading);
 	text-underline-offset: 25%;
+
+	/*
+	 * キーワードの大きさ（auto など）へのトランジションは今はないが、ベーススタイルとして先に許しておく。
+	 * 動きを減らす設定では、大きさを一度に切り替える（interpolate-size-in-base）
+	 */
+	@media (prefers-reduced-motion: no-preference) {
+		interpolate-size: allow-keywords;
+	}
 
 	&:lang(ja) {
 		font-kerning: none;
@@ -114,4 +125,15 @@ kbd,
 samp,
 pre {
 	font-family: var(--text--code--font-family);
+}
+
+/* 本文の中のコード。図の中のコードは patterns のレイヤーで上書きする */
+:not(pre) > code {
+	padding-inline: 0.3em;
+	border-radius: var(--rounded--sm);
+	background-color: var(--background--surface);
+	font-size: 0.9em;
+
+	/* 識別子やコマンドを途中で切ると読み違えるので、本文の中のコードは途中で改行しない（DESIGN.md の「強調」） */
+	white-space: nowrap;
 }
