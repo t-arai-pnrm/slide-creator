@@ -1,0 +1,36 @@
+/**
+ * スライドの外の、画面の幅で決める大きさのトークン。値は DESIGN.md の「画面の端」の表を写す。
+ * ページの左右の余白は、taklog のページの余白と同じ値にする。
+ *
+ * @example
+ * padding-inline: var(--gutter--page-start) var(--gutter--page-end);
+ */
+:root {
+	/*
+	 * 画面の幅で連続的に変える値が、変わり始める幅と変わり終える幅（px 相当の数値）。
+	 * 値ごとには最小値と最大値だけを決め、区間の中の位置（--fluid--progress）をこの区間から求める（shared-fluid-range）。
+	 * 文書のルートの文字の大きさ（880px〜1280px で変わる）は、この区間を使わない（global.css）。
+	 * ルートの文字の大きさは、操作の部分とノートを狭い画面で縮めるために、DESIGN.md の「文字のスタイル」で 11px〜16px、1.25svi と決めた値で、
+	 * taklog と同じ値にしたページの余白とは別に決めているため
+	 */
+	--fluid--min-width: 375;
+	--fluid--max-width: 1280;
+
+	/*
+	 * 共通の区間の中で、画面の幅がどこにあるか（0〜1 の数値）。最小値に「最大値との差 × この値」を足すと、
+	 * 最小値と最大値がそのまま式に表れる。区間の外では 0 か 1 に収まるので、clamp() で挟まなくても最小値と最大値を超えない。
+	 * 区間の端は rem ではなく px で書く。このプロジェクトは文書のルートの文字の大きさを画面の幅で変えるので、
+	 * rem で書くと区間の端が画面の幅につれて動き、値が区間とずれるため
+	 */
+	--fluid--progress: progress(100svi, var(--fluid--min-width) * 1px, var(--fluid--max-width) * 1px);
+
+	/* ページの左右の余白。共通の区間で 16px から 64px まで変える */
+	--gutter--page: calc((16 + (64 - 16) * var(--fluid--progress)) * 1px);
+
+	/*
+	 * ノートなど、画面の端に接する要素の左右の余白。viewport-fit=cover なので、いつもの余白とセーフエリアの大きいほうにする
+	 * （safe-area-combine-with-max）。セーフエリアは物理的な辺なので、横書きの左から右の前提で、行頭を左、行末を右にする
+	 */
+	--gutter--page-start: max(var(--gutter--page), env(safe-area-inset-left));
+	--gutter--page-end: max(var(--gutter--page), env(safe-area-inset-right));
+}

@@ -97,6 +97,15 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 				grid-template: subgrid / subgrid;
 			}
 
+			/*
+			 * 縦に並べる形の最後のスライドは、画面の下の端からセーフエリアの分だけ空ける（DESIGN.md の「画面の端」）。
+			 * ノートがあれば、面を端まで塗るためノートの内側の余白で空ける（下の ._notes）ので、ノートがないときだけここで空ける。
+			 * いつもの余白は 0 で、セーフエリアと比べる（safe-area-combine-with-max）
+			 */
+			&:is(:global(.deck:not([data-view])) > *):last-child:not(:has(> ._notes)) {
+				padding-block-end: max(0px, env(safe-area-inset-bottom));
+			}
+
 			/* DESIGN.md の「枠」のとおり、枠を中央に置く */
 			& > ._frame {
 				grid-area: --frame;
@@ -410,13 +419,17 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 		}
 
 		/*
-		 * ノートは枠の外にあり、cqi が画面の幅で計算されるので、rem で書く。
+		 * ノートは枠の外にあり、cqi が画面の幅で計算されるので、枠の中の長さを使わない。
+		 * 上下の余白は文字と一緒に変わるよう rem で、左右の余白はページの余白（画面の幅で変わる px）で書く。
+		 * 面と上の辺の線は、どの表示でも付け、スライドとノートの境目を同じ見た目で示す（DESIGN.md の「枠」）。
 		 * 横長の画面では枠が画面を占めるので隠し、縦長の画面でだけ枠の下に出す。
 		 * 縦長かどうかは、幅と高さを比べる aspect-ratio で調べる（no-orientation-for-layout）
 		 */
 		._notes {
 			padding-block: 1.5rem;
-			padding-inline: 1rem;
+			padding-inline: var(--gutter--page-start) var(--gutter--page-end);
+			border-block-start: 1px solid var(--border--base);
+			background-color: var(--background--surface);
 			font-family: var(--text--notes--font-family);
 			font-size: var(--text--notes--font-size);
 			font-weight: var(--text--notes--font-weight);
@@ -438,16 +451,31 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 
 			/*
 			 * 発表の表示でノートを出したときと発表者ビューでは、画面の向きにかかわらず出す。
-			 * 枠の下か横に別の領域として置くので、面と上の辺の線で枠と区切る。
+			 * 枠の下か横に別の領域として置く。
 			 * 下の 3 割の領域に収まらない長さのノートは、領域の中でスクロールさせる
 			 */
 			&:is(:global(.deck[data-notes='shown']) *) {
 				@media screen {
 					display: block flow;
 					overflow-y: auto;
-					border-block-start: 1px solid var(--border--base);
-					background-color: var(--background--surface);
 				}
+			}
+
+			/*
+			 * 画面の下の端に接する表示（発表の表示でノートを出したときと、縦に並べる形の最後のスライド）では、
+			 * 面を画面の端まで塗り、文字だけをセーフエリアの内側に寄せる（safe-area-background-to-edge、safe-area-combine-with-max）
+			 */
+			&:is(:global(.deck[data-view='present']) *),
+			&:is(:global(.deck:not([data-view])) > .slide:last-child *) {
+				padding-block-end: max(1.5rem, env(safe-area-inset-bottom));
+			}
+
+			/*
+			 * 発表者ビューでは、画面の端からの余白とセーフエリアを、置く側の body の内側の余白で取る（Deck.astro）。
+			 * ノートでもセーフエリアと比べると、右の端で二重に空くので、いつものページの余白にする
+			 */
+			&:is(:global(.deck[data-view='presenter']) *) {
+				padding-inline: var(--gutter--page);
 			}
 
 			/* 発表者ビューの前と次のスライドは、枠だけを見せる。上の指定より後に書いて勝たせる */

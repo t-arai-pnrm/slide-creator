@@ -12,6 +12,7 @@
 @import url('./tokens/colors.css') layer(tokens);
 @import url('./tokens/typography.css') layer(tokens);
 @import url('./tokens/spacing.css') layer(tokens);
+@import url('./tokens/sizes.css') layer(tokens);
 @import url('./tokens/shapes.css') layer(tokens);
 @import url('./tokens/motion.css') layer(tokens);
 @import url('./tokens/z-index.css') layer(tokens);

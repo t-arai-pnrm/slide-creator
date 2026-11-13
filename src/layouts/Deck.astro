@@ -21,7 +21,8 @@ const { title } = Astro.props
 <html lang="ja">
 	<head>
 		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<!-- viewport-fit=cover は、ノートの面と枠の外の色を、ノッチやホームインジケーターのある端末でも画面の端まで塗るため（DESIGN.md の「画面の端」） -->
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 		<title>{title}</title>
 		<!-- 初期値は OS の設定にかかわらずライトにする（発表者の OS がダークのまま映す失敗を防ぐため）。切り替えはこの content を書き換える -->
 		<meta name="color-scheme" content="light only" />
@@ -100,10 +101,18 @@ const { title } = Astro.props
 				/*
 				 * 枠の右上の角の内側に置く。右下にはスライドのページ番号があり、重なるため。
 				 * 画面に固定した要素からは枠の位置を参照できないので、枠が収める高さの中で上下の中央に、
-				 * 画面の左右の中央にあることから、上の辺と右の辺の位置を枠の大きさで求める
+				 * 画面の左右の中央にあることから、上の辺と右の辺の位置を枠の大きさで求める。
+				 * 画面の端から浮かせて置くので、セーフエリアに --_inset を足した位置と比べ、大きいほうにする
+				 * （safe-area-combine-with-max、safe-area-fixed-bottom の補足）。セーフエリアは物理的な辺なので、上と右で比べる
 				 */
-				inset-block-start: calc((var(--_stage-block-size) - var(--_frame-block-size)) / 2 + var(--_inset));
-				inset-inline-end: calc((100% - var(--_frame-inline-size)) / 2 + var(--_inset));
+				inset-block-start: max(
+					(var(--_stage-block-size) - var(--_frame-block-size)) / 2 + var(--_inset),
+					calc(env(safe-area-inset-top) + var(--_inset))
+				);
+				inset-inline-end: max(
+					(100% - var(--_frame-inline-size)) / 2 + var(--_inset),
+					calc(env(safe-area-inset-right) + var(--_inset))
+				);
 			}
 
 			&:has(> .deck[data-view='present'][data-notes='shown']) > :global(.deck-controls) {
@@ -126,9 +135,13 @@ const { title } = Astro.props
 				/*
 				 * 経過時間、デッキ、操作の部分を、画面の端から 1rem 離す。端からの余白は置き場所で決まるので、
 				 * 子のルートではなく、置く側の body の内側の余白で取る
-				 * （no-external-layout-on-root、parent-owns-child-placement、margin-collapse-padding-for-inner-space）
+				 * （no-external-layout-on-root、parent-owns-child-placement、margin-collapse-padding-for-inner-space）。
+				 * 画面の端に接する余白なので、辺ごとにセーフエリアと比べて大きいほうにする（safe-area-combine-with-max）。
+				 * セーフエリアは物理的な辺なので、上、右、下、左の順の一括指定で書く。
+				 * 面は body の背景（文書のルートと同じ色）なので、body の内側の余白で取っても、色が途切れた帯はできない
 				 */
-				padding: 1rem;
+				padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
+					max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
 
 				/* 操作の部分は、画面の下の端の左に置き、帯の幅を中身の幅のままにする（DESIGN.md の「発表者ビュー」） */
 				& > :global(.deck-controls) {
@@ -159,6 +172,16 @@ const { title } = Astro.props
 				color-scheme: light;
 				background-color: var(--background--base);
 				color: var(--foreground--base);
+			}
+
+			/*
+			 * 縦に並べる形では、最初のスライドの枠を、画面の上の端からセーフエリアの分だけ下げる（DESIGN.md の「画面の端」）。
+			 * いつもの余白は 0 で、セーフエリアと比べる（safe-area-combine-with-max）。
+			 * 枠の外の面は文書のルートと同じ色なので、デッキの内側の余白で空けても、色が途切れた帯はできない。
+			 * 最後のスライドの下は、ノートの面を画面の端まで塗るため、Slide.astro の側で空ける
+			 */
+			&:not([data-view]) {
+				padding-block-start: max(0px, env(safe-area-inset-top));
 			}
 
 			/*
