@@ -25,7 +25,6 @@
 	color: var(--foreground--muted);
 	font-family: var(--text--label--font-family);
 	font-size: var(--text--label--font-size);
-	font-weight: var(--text--label--font-weight);
 	line-height: var(--text--label--leading);
 
 	/* 帯の上下の余白を文字の上端と下端から測るため、ハーフレディングを刈る */
@@ -58,6 +57,11 @@
 			border: var(--line-width--thin) solid var(--border--base);
 			border-radius: var(--rounded--sm);
 		}
+
+		/* 強調した行の背景を、pre の左右の余白の端まで広げる */
+		& > [data-mark] {
+			margin-inline: calc(-1 * var(--spacing--md));
+		}
 	}
 
 	.comment {
@@ -77,17 +81,16 @@
 	}
 
 	/*
-	 * 強調した行。背景を左右の余白の端まで広げる。
+	 * 強調した行。
 	 * 背景の色だけに頼らないよう、左端に線を引き、線の太さの分だけ余白を減らして文字の位置を保つ（no-color-only-information）
 	 */
 	[data-mark] {
 		display: block flow;
-		margin-inline: calc(-1 * var(--spacing--md));
 		padding-inline: calc(var(--spacing--md) - var(--line-width--thin)) var(--spacing--md);
 		border-inline-start: var(--line-width--thin) solid var(--accent--base);
 		background-color: var(--syntax--mark);
 
-		/* 強制カラーモードでは背景が消えるので、線をシステムカラーにして残す */
+		/* 強制カラーモードで背景が消えても、線の色を CanvasText に決めて残す（DESIGN.md の「コードブロック」） */
 		@media (forced-colors: active) {
 			border-inline-start-color: CanvasText;
 		}
@@ -162,11 +165,13 @@
  */
 .diagram-code {
 	padding-inline: initial;
-	border-radius: initial;
 	background-color: initial;
 	font-family: var(--text--code--font-family);
 	font-size: var(--text--code--font-size);
 	line-height: var(--text--code--leading);
+
+	/* 図の箱は狭いので、本文の中のコードと違い折り返しを許す */
+	text-wrap-mode: initial;
 }
 
 /* 和文が 1 字だけ次の行に残らないよう、文節で折り返す（対応していないブラウザでは通常の折り返し） */
@@ -211,7 +216,7 @@
 }
 
 /* 数値のレイアウトの数字 */
-.numbers-value {
+.number-value {
 	font-family: var(--text--number--font-family);
 	font-size: var(--text--number--font-size);
 	font-weight: var(--text--number--font-weight);
@@ -404,8 +409,8 @@
 	letter-spacing: var(--text--label--tracking);
 }
 
-/* 数値のレイアウトの意味の 1 行 */
-.number-block {
+/* 数値のレイアウトの、数字とその意味の 1 行の組 */
+.number-figure {
 	display: block grid;
 	gap: var(--spacing--xs);
 }

@@ -180,7 +180,7 @@ const REEL = Array.from({ length: 10 }, (_, value) => value)
 			/* 帯の内側の余白。ボタンの角丸も、帯の角丸からこの値を引いて求める（DESIGN.md の「操作の部分」） */
 			--_band-padding: 0.25rem;
 
-			/* ボタンの間。隙間は、両側のボタンが半分ずつ押せる範囲として持つ（no-gaps-between-hover-items） */
+			/* ボタンの間。隙間は、両側のボタンが半分ずつ押せる範囲として持つ（pseudo-hit-area-no-overlap） */
 			--_button-gap: 0.125rem;
 
 			/* 帯の中のボタンを、ポインターかキーボードのフォーカスが指しているか（hocus-via-style-query） */
@@ -277,7 +277,7 @@ const REEL = Array.from({ length: 10 }, (_, value) => value)
 		/*
 		 * ボタンは数が決まっていて、帯の 1 行に収まるので、折り返さない。
 		 * ボタンの間の隙間は、両側のボタンの押せる範囲（::after）が半分ずつ覆うので、
-		 * ポインターが隙間を通る間もどれかのボタンの上にある（no-gaps-between-hover-items）
+		 * ポインターが隙間を通る間もどれかのボタンの上にある（pseudo-hit-area-no-overlap）
 		 */
 		menu {
 			display: block flex;

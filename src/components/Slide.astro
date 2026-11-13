@@ -62,8 +62,11 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 		 * （is-for-ancestor-context）。デッキの CSS からは、このコンポーネントのルートの配置だけを決める
 		 */
 		.slide {
-			/* 発表の表示でノートを出したとき、画面の下の 3 割をノートの領域にする（DESIGN.md の「枠」） */
-			--_notes-share: var(--notes--share);
+			/*
+			 * 発表の表示でノートを出したときの、ノートの領域の割合。枠の位置を求める Deck.astro と同じ値にするため、
+			 * トークンから受ける（share-look-with-tokens。DESIGN.md の「枠」）
+			 */
+			--_notes-share: var(--ratio--notes);
 
 			/* 枠を収める高さ。ふだんは画面の高さで、ノートの領域を取ったときはその残り */
 			--_stage-block-size: var(--slide--stage-block-size, 100svb);
@@ -75,20 +78,20 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			 * レイアウト（data-layout）で値だけが変わる宣言は、ここで内部プロパティとして宣言し直し、
 			 * 子のルールは読むだけにする。子のセレクタにレイアウトの条件を足すと、詳細度が上がるため（state-suffix-for-custom-properties）
 			 */
-			--_inner-grid-template: '--heading' '--body' 1fr '--page' / 1fr;
+			--_frame-inner-grid-template: '--heading' '--body' 1fr '--page' / 1fr;
 			--_heading-max-inline-size: none;
 			--_heading-padding-block-start: 0;
+			--_heading-padding-block-end: 0;
 			--_heading-border-block-start: none;
 			--_heading-rule-width: var(--line-width--thin);
 			--_title-font-size: var(--text--title--font-size);
 			--_title-leading: var(--text--title--leading);
-			--_body-margin-block-start: 0;
 			--_body-align-self: auto;
 			--_body-max-inline-size: none;
 
-			/* 表紙、章の扉、最後は、題名を枠の下寄りに置き、上を空ける */
+			/* 表紙、章の扉、最後の配置（DESIGN.md の「レイアウトの一覧」） */
 			&:is([data-layout='cover'], [data-layout='section'], [data-layout='end']) {
-				--_inner-grid-template: '.' 1fr '--heading' '--body' '--page' / 1fr;
+				--_frame-inner-grid-template: '.' 1fr '--heading' '--body' '--page' / 1fr;
 			}
 
 			/* 表紙、章の扉、主張、最後は、題名を display のスタイルにする（DESIGN.md の「レイアウトの一覧」） */
@@ -101,16 +104,19 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			 * 表紙と最後は、題名の上にアクセントの太い線を引く。アクセントはこの 1 か所だけにする。
 			 * 題名の幅の上限は、DESIGN.md の「レイアウトの一覧」の、レイアウトごとの幅の上限。
 			 * 表紙と最後には題名の下の線がないので、本文（発表者の名前など）との間を、
-			 * ふつうのスライドが題名の下の線の上に空ける spacing--sm の分だけ広げ、ほかのスライドとそろえる
+			 * ふつうのスライドが題名の下の線の上に空ける spacing--sm の分だけ広げ、ほかのスライドとそろえる。
+			 * row-gap はすべての行の間に同じ値が入り、この間だけを広げられないので、広げる分は題名の側（hgroup）の
+			 * 下の内側の余白で取る。本文の側の margin にしないのは、間隔を兄弟の間の余白として子に持たせないため
+			 * （gap-over-child-margin、block-margin-with-sibling-combinator）
 			 */
 			&:is([data-layout='cover'], [data-layout='end']) {
 				--_heading-max-inline-size: 75cqi;
 				--_heading-padding-block-start: var(--spacing--md);
+				--_heading-padding-block-end: var(--spacing--sm);
 				--_heading-border-block-start: var(--line-width--thick) solid var(--accent--base);
-				--_body-margin-block-start: var(--spacing--sm);
 			}
 
-			/* 章の扉は、題名の下に太い線を引く */
+			/* 章の扉の太い罫線（DESIGN.md の「レイアウトの一覧」） */
 			&[data-layout='section'] {
 				--_heading-rule-width: var(--line-width--thick);
 			}
@@ -120,11 +126,11 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 			 * 補足の幅の上限は、DESIGN.md の「レイアウトの一覧」の、レイアウトごとの幅の上限
 			 */
 			&[data-layout='statement'] {
-				--_inner-grid-template: '.' 1fr '--heading' '--body' '.' 1fr '--page' / 1fr;
+				--_frame-inner-grid-template: '.' 1fr '--heading' '--body' '.' 1fr '--page' / 1fr;
 				--_body-max-inline-size: 70cqi;
 			}
 
-			/* 数値は、数字を本文の領域の下寄りに大きく置く */
+			/* 数値の配置（DESIGN.md の「レイアウトの一覧」） */
 			&[data-layout='number'] {
 				--_body-align-self: end;
 			}
@@ -212,7 +218,7 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 		 * （no-padding-on-container）
 		 */
 		._frame {
-			--_ratio: var(--frame--aspect-ratio);
+			--_ratio: var(--aspect-ratio--frame);
 
 			container: --frame / inline-size;
 
@@ -264,7 +270,7 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 		._frame-inner {
 			display: block grid;
 			reading-flow: grid-rows;
-			grid-template: var(--_inner-grid-template);
+			grid-template: var(--_frame-inner-grid-template);
 			row-gap: var(--spacing--md);
 			padding-block: var(--guide--block);
 			padding-inline: var(--guide--inline);
@@ -282,12 +288,6 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 				 * 本文の領域を残りの高さに収め、収まらない中身はこの中からあふれさせて、ページ番号の位置を保つ
 				 */
 				min-block-size: 0;
-
-				/*
-				 * row-gap はすべての行の間に同じ値が入り、表紙と最後の題名と本文の間だけを広げられないので、
-				 * 広げる分を gap ではなく margin で足す
-				 */
-				margin-block-start: var(--_body-margin-block-start);
 			}
 
 			& > ._page {
@@ -298,7 +298,7 @@ const notesLabel = `スピーカーノート（${page} / ${total}）`
 
 		hgroup {
 			max-inline-size: var(--_heading-max-inline-size);
-			padding-block-start: var(--_heading-padding-block-start);
+			padding-block: var(--_heading-padding-block-start) var(--_heading-padding-block-end);
 			border-block-start: var(--_heading-border-block-start);
 
 			/*

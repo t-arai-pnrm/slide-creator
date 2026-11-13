@@ -93,7 +93,7 @@ import Icon from '@/components/Icon.astro'
 			/* 帯の内側の余白。ボタンの角丸も、帯の角丸からこの値を引いて求める（DESIGN.md の「操作の部分」） */
 			--_band-padding: 0.25rem;
 
-			/* ボタンの間。隙間は、両側のボタンが半分ずつ押せる範囲として持つ（no-gaps-between-hover-items） */
+			/* ボタンの間。隙間は、両側のボタンが半分ずつ押せる範囲として持つ（pseudo-hit-area-no-overlap） */
 			--_button-gap: 0.125rem;
 
 			/* 組の間の線の太さ。線の上を押せる範囲として持つ、前の組の最後のボタンの計算にも使う */
@@ -116,10 +116,7 @@ import Icon from '@/components/Icon.astro'
 			/* キーボードのフォーカスが帯の中のボタンにあるか。ハイライトとツールチップを動かさずに切り替えるのに使う */
 			--_has-focus-visible: --false;
 
-			/*
-			 * ハイライトの包含ブロックにする。発表の表示では、置く側の Deck.astro の position: fixed が勝ち、
-			 * それも包含ブロックを作るので、どちらの表示でもハイライトは帯を基準に置かれる
-			 */
+			/* ハイライト（::before）の包含ブロックにする */
 			position: relative;
 
 			/* 帯は 1 つだけだが、アンカーの名前がほかの部品に届かないよう、範囲を帯の中に限る（anchor-scope-for-repeated-components） */
@@ -273,7 +270,7 @@ import Icon from '@/components/Icon.astro'
 		/*
 		 * 組の中のボタンは数が決まっていて、帯の 1 行に収まるので、折り返さない。
 		 * ボタンの間の隙間は、両側のボタンの押せる範囲（::after）が半分ずつ覆うので、
-		 * ポインターが隙間を通る間もどれかのボタンの上にある（no-gaps-between-hover-items）
+		 * ポインターが隙間を通る間もどれかのボタンの上にある（pseudo-hit-area-no-overlap）
 		 */
 		menu {
 			display: block flex;
@@ -382,6 +379,7 @@ import Icon from '@/components/Icon.astro'
 				}
 			}
 
+			/* ツールチップの名前は、押せないボタン（aria-disabled）にも出す */
 			&:enabled:hover {
 				@media (any-hover) {
 					--_is-hocus: --true;

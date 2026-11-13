@@ -55,8 +55,10 @@ const { title } = Astro.props
 		</style>
 	</head>
 	<body>
-		<!-- 発表者ビューで画面の上の端に置くので、読む順もスライドより前にする -->
-		<PresenterTimer />
+		<!-- 発表者ビューで画面の上の端に置くので、読む順もスライドより前にする。経過時間の置き場所を決める Outer -->
+		<div class="_timer">
+			<PresenterTimer />
+		</div>
 		<main class="deck">
 			<h1 class="_title | -visually-hidden">{title}</h1>
 			<slot />
@@ -77,10 +79,10 @@ const { title } = Astro.props
 	@layer components {
 		/*
 		 * デッキの表示（data-view）とノートの表示（data-notes）は main.deck にあり、
-		 * 経過時間と操作の部分（を包む ._controls）は main.deck の外の兄弟にある。そこで、置く側の body が :has() で自分の状態として受け、
+		 * 経過時間と操作の部分（を包む ._timer と ._controls）は main.deck の外の兄弟にある。そこで、置く側の body が :has() で自分の状態として受け、
 		 * 子が読むフラグと値を body で宣言する。子の配置のネストは、それを var() とスタイルクエリで読むだけにする
 		 * （is-for-ancestor-context、nest-own-states-only、placement-via-public-flag）。
-		 * スタイルクエリは親の値を問い合わせる。経過時間と ._controls の親は body で、スライドの親の .deck は body から値を継承する。
+		 * スタイルクエリは親の値を問い合わせる。._timer と ._controls の親は body で、スライドの親の .deck は body から値を継承する。
 		 * body の内部プロパティは .deck と .slide にも継承されるので、Slide.astro の内部プロパティと重ならない名前にする
 		 */
 		body {
@@ -102,8 +104,8 @@ const { title } = Astro.props
 			 * 高さは上からの位置に使うので、画面の幅を svi で表す。スクロールバーの幅を取る環境では、
 			 * 枠の高さより数 px 大きく見積もる。比は「16 / 9」のまま置き換わるので、割るときは括弧で包む
 			 */
-			--_controls-frame-inline-size: min(100%, var(--_controls-stage-block-size) * var(--frame--aspect-ratio));
-			--_controls-frame-block-size: min(var(--_controls-stage-block-size), 100svi / (var(--frame--aspect-ratio)));
+			--_controls-frame-inline-size: min(100%, var(--_controls-stage-block-size) * var(--aspect-ratio--frame));
+			--_controls-frame-block-size: min(var(--_controls-stage-block-size), 100svi / (var(--aspect-ratio--frame)));
 
 			/* 枠の上の辺と右の辺から離す距離（DESIGN.md の「操作の部分」） */
 			--_controls-inset: 1rem;
@@ -113,7 +115,7 @@ const { title } = Astro.props
 			}
 
 			&:has(> .deck[data-view='present'][data-notes='shown']) {
-				--_controls-stage-block-size: calc(100svb * (1 - var(--notes--share)));
+				--_controls-stage-block-size: calc(100svb * (1 - var(--ratio--notes)));
 			}
 
 			/*
@@ -125,9 +127,6 @@ const { title } = Astro.props
 			 */
 			&:has(> .deck[data-view='presenter']) {
 				--_is-presenter-view: --true;
-
-				/* 操作の部分は画面の下の端にあるので、ツールチップをボタンの上に出す（DESIGN.md の「発表者ビュー」）。公開プロパティで、包む側から渡す */
-				--deck-controls--tooltip-side: --block-start;
 
 				display: block grid;
 				grid-template-rows: auto minmax(0, 1fr) auto;
@@ -149,7 +148,7 @@ const { title } = Astro.props
 			/*
 			 * 操作の部分の置き場所は置く側のこのファイルが決め、包む Outer の ._controls に書く
 			 * （parent-owns-child-placement、no-external-layout-on-root）。
-			 * DeckControls のルートは、ハイライトとツールチップの包含ブロックにするため position: relative を持つ。
+			 * DeckControls のルートは、ハイライトの包含ブロックにするため position: relative を持つ。
 			 * ルートを選んで position を書くと、同じレイヤーの中で詳細度の競争になるので、ルートは選ばない
 			 * （order-by-layer-not-specificity）。帯の幅は中身の幅のままなので、Outer の大きさは帯と同じになる
 			 */
@@ -173,19 +172,26 @@ const { title } = Astro.props
 					);
 				}
 
-				/* 発表者ビューでは、画面の下の端の左に置き、帯の幅を中身の幅のままにする（DESIGN.md の「発表者ビュー」） */
+				/*
+				 * 発表者ビューでは、画面の下の端の左に置き、帯の幅を中身の幅のままにする。
+				 * 画面の下の端にあり、下に出すとツールチップが画面の外にはみ出すので、ボタンの上に出す。
+				 * 公開プロパティで、包む側から渡す（placement-via-public-flag。DESIGN.md の「発表者ビュー」）
+				 */
 				@container style(--_is-presenter-view: --true) {
+					--deck-controls--tooltip-side: --block-start;
+
 					justify-self: start;
 				}
 			}
 
 			/*
+			 * 経過時間の置き場所も、包む Outer の ._timer に書く（parent-owns-child-placement）。
 			 * 発表者ビューの経過時間のツールチップは、下のデッキに重なる。デッキは HTML の順で後ろにあり、
 			 * 大きさのコンテナとして重なりの区切りを作るので、木の順のままではツールチップが隠れる。
-			 * 経過時間はグリッドのアイテムなので、position を足さずに z-index で前に出す
+			 * ._timer はグリッドのアイテムなので、position を足さずに z-index で前に出す
 			 * （z-index-absolute-root-relative-inside、z-index-on-items-without-position）
 			 */
-			& > :global(.presenter-timer) {
+			& > ._timer {
 				@container style(--_is-presenter-view: --true) {
 					z-index: var(--z--timer);
 				}
