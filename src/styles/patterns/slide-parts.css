@@ -2,22 +2,12 @@
  * スライドの本文に置く部品（コード、流れ、比較、数値、階層、時系列、前と後、引用、画像、出典の一覧）。
  * 値は DESIGN.md の「コードブロック」「定型の図」「動き」に合わせている。
  * 大きさはすべて枠の幅に対する割合（cqi）で、スライドの枠の中でだけ使う。
+ * 図で強調する箱、列、時点は、原稿で data-variant="strong" を付けて選ぶ。
  */
-
-/* 本文の中のコード */
-.slide :not(pre) > code:not(.flow-code) {
-	padding-inline: 0.3em;
-	border-radius: var(--rounded--sm);
-	background-color: var(--background--surface);
-	font-family: var(--text--code--font-family);
-	font-size: 0.9em;
-
-	/* 識別子やコマンドを途中で切ると読み違えるので、本文の中のコードは途中で改行しない（DESIGN.md の「強調」） */
-	white-space: nowrap;
-}
 
 /*
  * 言語の名前の帯を付けたコードブロック。帯とコードを 1 つの箱にするため、枠と角丸は figure に描く。
+ * 中のコードの面の角が角丸からはみ出さないよう、中身を切る。
  * figure の既定の margin は kiso.css が消している
  */
 .code-figure {
@@ -27,7 +17,7 @@
 	background-color: var(--background--surface);
 }
 
-/* 言語の名前の帯。コードの左端に文字をそろえ、細い線でコードと区切る */
+/* 言語の名前の帯。左右の余白をコードと同じにし、言語の名前をコードの左端にそろえる */
 .code-label {
 	padding-block: var(--spacing--xs);
 	padding-inline: var(--spacing--md);
@@ -35,7 +25,6 @@
 	color: var(--foreground--muted);
 	font-family: var(--text--label--font-family);
 	font-size: var(--text--label--font-size);
-	font-weight: var(--text--label--font-weight);
 	line-height: var(--text--label--leading);
 
 	/* 帯の上下の余白を文字の上端と下端から測るため、ハーフレディングを刈る */
@@ -44,45 +33,67 @@
 	text-transform: uppercase;
 }
 
-/* コードブロック。pre の既定の margin は kiso.css が消している */
-.code-block {
-	overflow: clip;
-	padding-block: var(--spacing--sm);
-	padding-inline: var(--spacing--md);
-	background-color: var(--background--surface);
-	color: var(--syntax--foreground);
-	font-family: var(--text--code--font-family);
-	font-size: var(--text--code--font-size);
-	line-height: var(--text--code--leading);
-	white-space: pre;
+/*
+ * コードブロック（<pre class="code-block">）。色分けのクラスと強調した行の data-mark は、
+ * このパターンの中でだけ意味を持つので、@scope でパターンの中に閉じる。
+ * pre の既定の margin は kiso.css が、書体は base が決めている
+ */
+@scope (.code-block) {
+	:scope {
+		/*
+		 * 発表中はスクロールできないので、スクロールバーを出さず、枠からはみ出した行は切る。
+		 * 収まらないコードは、行を分けるか削る（DESIGN.md の「1 枚に入れてよい量」）
+		 */
+		overflow: clip;
+		padding-block: var(--spacing--sm);
+		padding-inline: var(--spacing--md);
+		background-color: var(--background--surface);
+		color: var(--syntax--foreground);
+		font-size: var(--text--code--font-size);
+		line-height: var(--text--code--leading);
 
-	/* 帯がないときだけ、コード自身に枠と角丸を描く。帯があるときは .code-figure が描く */
-	&:not(.code-figure > *) {
-		border: var(--line-width--thin) solid var(--border--base);
-		border-radius: var(--rounded--sm);
+		/* 帯がないときだけ、コード自身に枠と角丸を描く。帯があるときは .code-figure が描く */
+		&:not(.code-figure > *) {
+			border: var(--line-width--thin) solid var(--border--base);
+			border-radius: var(--rounded--sm);
+		}
+
+		/* 強調した行の背景を、pre の左右の余白の端まで広げる */
+		& > [data-mark] {
+			margin-inline: calc(-1 * var(--spacing--md));
+		}
 	}
 
-	& .-c {
+	.comment {
 		color: var(--syntax--comment);
 	}
 
-	& .-k {
+	.keyword {
 		color: var(--syntax--keyword);
 	}
 
-	& .-p {
+	.property {
 		color: var(--syntax--property);
 	}
 
-	& .-s {
+	.string {
 		color: var(--syntax--string);
 	}
 
-	& .-mark {
+	/*
+	 * 強調した行。
+	 * 背景の色だけに頼らないよう、左端に線を引き、線の太さの分だけ余白を減らして文字の位置を保つ（no-color-only-information）
+	 */
+	[data-mark] {
 		display: block flow;
-		margin-inline: calc(-1 * var(--spacing--md));
-		padding-inline: var(--spacing--md);
+		padding-inline: calc(var(--spacing--md) - var(--line-width--thin)) var(--spacing--md);
+		border-inline-start: var(--line-width--thin) solid var(--accent--base);
 		background-color: var(--syntax--mark);
+
+		/* 強制カラーモードで背景が消えても、線の色を CanvasText に決めて残す（DESIGN.md の「コードブロック」） */
+		@media (forced-colors: active) {
+			border-inline-start-color: CanvasText;
+		}
 	}
 }
 
@@ -96,13 +107,12 @@
 	grid-auto-columns: 1fr;
 	grid-auto-flow: column;
 	gap: var(--spacing--sm);
-	align-items: stretch;
 
-	&:has(> li > .flow-arrow) {
+	&:has(> li > .diagram-arrow) {
 		grid-auto-columns: 1fr auto;
 	}
 
-	& > li:has(> .flow-arrow) {
+	& > li:has(> .diagram-arrow) {
 		grid-column: span 2;
 	}
 }
@@ -110,16 +120,17 @@
 .flow > li {
 	display: block grid;
 
-	&:has(> .flow-arrow) {
+	&:has(> .diagram-arrow) {
 		grid-template-columns: subgrid;
 	}
 
-	& > .flow-arrow {
+	& > .diagram-arrow {
 		align-self: center;
 	}
 }
 
-.flow-item {
+/* 図の箱（流れ、階層、前と後） */
+.diagram-box {
 	display: block grid;
 	gap: var(--spacing--xs);
 	align-content: start;
@@ -128,37 +139,44 @@
 	border-radius: var(--rounded--sm);
 	background-color: var(--background--surface);
 
-	&.-strong {
+	/* 面は塗らない。アクセントの面の上の文字は 9:1 に届かないため（DESIGN.md の「アクセントの使い方」） */
+	&[data-variant='strong'] {
 		border: var(--line-width--thick) solid var(--accent--base);
 	}
 }
 
 /* 流れの図と、前と後の図で、箱をつなぐ矢印 */
-.flow-arrow {
+.diagram-arrow {
 	color: var(--foreground--muted);
-	font-size: var(--text--body--font-size);
 }
 
-.flow-label {
+.diagram-label {
 	color: var(--foreground--muted);
 	font-family: var(--text--label--font-family);
 	font-size: var(--text--label--font-size);
+	line-height: var(--text--label--leading);
 	letter-spacing: var(--text--label--tracking);
 	text-transform: uppercase;
 }
 
-/* 箱の主役のコード。本文の中のコードと違い、面を付けずに 1 行で置く */
-.flow-code {
+/*
+ * 箱の主役のコード。本文の中のコード（base の :not(pre) > code）と違い、面と左右の余白を付けない。
+ * 箱の面と同じ色の面を重ねても見えず、左右の余白だけが箱の中の文字の左端をずらすため
+ */
+.diagram-code {
+	padding-inline: initial;
+	background-color: initial;
 	font-family: var(--text--code--font-family);
 	font-size: var(--text--code--font-size);
 	line-height: var(--text--code--leading);
+
+	/* 図の箱は狭いので、本文の中のコードと違い折り返しを許す */
+	text-wrap-mode: initial;
 }
 
 /* 和文が 1 字だけ次の行に残らないよう、文節で折り返す（対応していないブラウザでは通常の折り返し） */
-.flow-text {
-	font-size: var(--text--body--font-size);
-	font-weight: var(--text--title--font-weight);
-	line-height: var(--text--title--leading);
+.diagram-text {
+	font-weight: var(--font-weight--bold);
 	word-break: auto-phrase;
 }
 
@@ -169,15 +187,25 @@
 	gap: var(--spacing--lg);
 }
 
+/*
+ * 比較の列。上の辺の線で列の頭を示す。強調する列は、色に加えて線の太さも変え、
+ * 強制カラーモードで色が消えても見分けられるようにする（no-color-only-information）
+ */
 .compare-item {
+	--_p--border-width: var(--line-width--thin);
+	--_p--border-color: var(--border--base);
+
 	display: block grid;
 	gap: var(--spacing--sm);
 	align-content: start;
-	padding-block-start: var(--spacing--sm);
-	border-block-start: var(--line-width--thick) solid var(--border--base);
 
-	&.-strong {
-		border-block-start-color: var(--accent--base);
+	/* 線の太さが違っても 2 列の中身の上端がそろうよう、太い線との差を余白に足す */
+	padding-block-start: calc(var(--spacing--sm) + var(--line-width--thick) - var(--_p--border-width));
+	border-block-start: var(--_p--border-width) solid var(--_p--border-color);
+
+	&[data-variant='strong'] {
+		--_p--border-width: var(--line-width--thick);
+		--_p--border-color: var(--accent--base);
 	}
 }
 
@@ -188,29 +216,12 @@
 }
 
 /* 数値のレイアウトの数字 */
-.numbers-value {
+.number-value {
 	font-family: var(--text--number--font-family);
 	font-size: var(--text--number--font-size);
 	font-weight: var(--text--number--font-weight);
-	font-variant-numeric: tabular-nums;
 	line-height: var(--text--number--leading);
 	letter-spacing: var(--text--number--tracking);
-}
-
-/* 箱の共通の見た目。図の中の箱は、面を background--surface、枠を細い線にする */
-.figure-box {
-	display: block grid;
-	gap: var(--spacing--xs);
-	align-content: start;
-	padding: var(--spacing--sm);
-	border: var(--line-width--thin) solid var(--border--base);
-	border-radius: var(--rounded--sm);
-	background-color: var(--background--surface);
-
-	/* 強調する箱は 1 つまで。面は塗らず、枠をアクセントの太い線にする */
-	&.-strong {
-		border: var(--line-width--thick) solid var(--accent--base);
-	}
 }
 
 /*
@@ -219,11 +230,11 @@
  */
 .tree {
 	display: block grid;
+	row-gap: calc(2 * var(--spacing--sm));
 	justify-items: center;
 
 	& > .tree-children {
 		justify-self: stretch;
-		margin-block-start: calc(2 * var(--spacing--sm));
 	}
 }
 
@@ -291,32 +302,40 @@
 }
 
 .timeline > * {
+	--_p--dot-border-width: var(--line-width--thin);
+	--_p--dot-border-color: var(--foreground--base);
+
 	position: relative;
 	display: block grid;
 	gap: var(--spacing--xs);
 	align-content: start;
 	padding-block-start: var(--spacing--md);
+
+	/* 上の線を時点の間で切らないよう、時点の間を gap ではなく各時点の右の余白で取る */
 	padding-inline-end: var(--spacing--sm);
 	border-block-start: var(--line-width--thin) solid var(--foreground--base);
 
-	/* 時点の印 */
+	/* 強調する時点は、印を太いアクセントの線にする */
+	&[data-variant='strong'] {
+		--_p--dot-border-width: var(--line-width--thick);
+		--_p--dot-border-color: var(--accent--base);
+	}
+
+	/*
+	 * 時点の印。包含ブロックは上の線の下端から始まるので、線の太さの半分だけ上げて、印の中心を線の中心にそろえる
+	 */
 	&::before {
 		--_p--dot-size: calc(var(--spacing--xs) * 1.5);
 
 		content: '';
 		position: absolute;
-		inset-block-start: calc(-1 * var(--_p--dot-size) / 2 + var(--line-width--thin) / 2);
+		inset-block-start: calc(-1 * (var(--_p--dot-size) + var(--line-width--thin)) / 2);
 		inset-inline-start: 0;
 		inline-size: var(--_p--dot-size);
 		aspect-ratio: 1;
-		border: var(--line-width--thin) solid var(--foreground--base);
+		border: var(--_p--dot-border-width) solid var(--_p--dot-border-color);
 		border-radius: 50%;
 		background-color: var(--background--base);
-	}
-
-	/* 強調する時点は、印を太いアクセントの線にする */
-	&.-strong::before {
-		border: var(--line-width--thick) solid var(--accent--base);
 	}
 }
 
@@ -325,9 +344,8 @@
 	display: block grid;
 	grid-template-columns: 1fr auto 1.1fr;
 	gap: var(--spacing--sm);
-	align-items: stretch;
 
-	& > .flow-arrow {
+	& > .diagram-arrow {
 		align-self: center;
 	}
 }
@@ -340,11 +358,6 @@
 	border-inline-start: var(--line-width--thick) solid var(--border--strong);
 }
 
-.quote > blockquote {
-	font-size: var(--text--body--font-size);
-	line-height: var(--text--body--leading);
-}
-
 /* 画像。角丸と細い枠を付け、本文の領域に収める。figure の既定の margin は kiso.css が消している */
 .slide-image {
 	display: block grid;
@@ -352,17 +365,24 @@
 }
 
 .slide-image > :is(img, svg) {
+	/*
+	 * width 属性の幅を外し、高さの上限で縮めたときに縦横の比を保つ。
+	 * 幅の上限（100%）と高さの auto は kiso.css が決めている
+	 */
 	inline-size: auto;
-	max-inline-size: 100%;
 	max-block-size: 30cqi;
-	border: var(--line-width--thin) solid var(--border--base);
 	border-radius: var(--rounded--sm);
+
+	/* 白い背景の画像でも縁が見えるよう、画像の大きさを変えずに内側へ線を引く */
+	outline: var(--line-width--thin) solid var(--border--base);
+	outline-offset: calc(-1 * var(--line-width--thin));
 }
 
 .slide-image > figcaption {
 	color: var(--foreground--muted);
 	font-family: var(--text--label--font-family);
 	font-size: var(--text--label--font-size);
+	line-height: var(--text--label--leading);
 	letter-spacing: var(--text--label--tracking);
 }
 
@@ -385,11 +405,12 @@
 	color: var(--foreground--muted);
 	font-family: var(--text--label--font-family);
 	font-size: var(--text--label--font-size);
+	line-height: var(--text--label--leading);
 	letter-spacing: var(--text--label--tracking);
 }
 
-/* 数値のレイアウトの意味の 1 行 */
-.number-block {
+/* 数値のレイアウトの、数字とその意味の 1 行の組 */
+.number-figure {
 	display: block grid;
 	gap: var(--spacing--xs);
 }
@@ -405,13 +426,12 @@
 	--_p--order: 2;
 
 	&:is(.deck[data-view='present'] > .slide[data-slide='current'] *) {
-		--_p--stagger: var(--duration--stagger);
 		--translate-from--y-value: var(--distance--enter);
 
 		animation-name: --fade-in;
 		animation-duration: var(--duration--slow);
 		animation-timing-function: var(--ease--out-quint);
-		animation-delay: calc(var(--_p--order) * var(--_p--stagger));
+		animation-delay: calc(var(--_p--order) * var(--duration--stagger));
 		animation-fill-mode: both;
 
 		@media (prefers-reduced-motion: no-preference) {

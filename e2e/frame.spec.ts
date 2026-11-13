@@ -13,7 +13,7 @@ const BODY_MIN_RATIO = 0.025
 const DECK_URL = '/sample/'
 
 const frames = (page: Page) => page.locator('.slide ._frame')
-const notes = (page: Page) => page.locator('.slide ._notes')
+const notes = (page: Page) => page.locator('.slide > aside')
 // 見本のデッキ（slides/sample/deck.mdx）は、最後の 1 枚にノートを書かない（ほかにもノートのないスライドがある）
 const slideWithoutNotes = (page: Page) => page.locator('section.slide').last()
 
@@ -127,7 +127,7 @@ test('文書に h1 が 1 つあり、各スライドが h2 の題名で名前付
 	)
 })
 
-// ノートを書かないスライドに、空の ._notes が出ないことを確かめる。マークアップは画面の向きで変わらないが、
+// ノートを書かないスライドに、空のノートの aside が出ないことを確かめる。マークアップは画面の向きで変わらないが、
 // 縦長の画面では空の領域として見えてしまうので、両方の向きで試す
 const NOTES_VIEWPORTS = [
 	{ name: '横長の画面', viewport: { width: 1280, height: 720 } },
@@ -138,9 +138,9 @@ for (const { name, viewport } of NOTES_VIEWPORTS) {
 	test.describe(`${name}（${viewport.width}×${viewport.height}）`, () => {
 		test.use({ viewport })
 
-		test('ノートのないスライドには ._notes がなく、ほかのノートには中身がある', async ({ page }) => {
+		test('ノートのないスライドにはノートの aside がなく、ほかのノートには中身がある', async ({ page }) => {
 			await page.goto(DECK_URL)
-			await expect(slideWithoutNotes(page).locator('._notes')).toHaveCount(0)
+			await expect(slideWithoutNotes(page).locator(':scope > aside')).toHaveCount(0)
 
 			const texts = await notes(page).allTextContents()
 			expect(texts.length).toBeGreaterThan(0)
@@ -161,7 +161,7 @@ test.describe('縦長の画面でのノートの名前', () => {
 		const total = slides.length
 		await Promise.all(
 			slides.map(async (slide, index) => {
-				const note = slide.locator('._notes')
+				const note = slide.locator(':scope > aside')
 				if ((await note.count()) === 0) return
 				await expect(note).toHaveAccessibleName(`スピーカーノート（${index + 1} / ${total}）`)
 			}),

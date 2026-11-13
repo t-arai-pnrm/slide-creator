@@ -80,6 +80,94 @@ const resolveBackgroundToken = (page: Page, token: string) =>
 		return value
 	}, token)
 
+type BandPoint = { label: string; x: number; y: number }
+
+/**
+ * ボタンの帯（band）の中で、ボタンの押せる範囲が覆うはずの点を、ボタンの位置から求める。
+ * - 組の中の隣り合うボタンの間の隙間の中央
+ * - 組の間の区切り線の上と、線とその両側のボタンの間の中央
+ * 高さは、どれもボタンの上下の中央にする。隠したボタン（発表者ビューのノートなど）は並びから外れるので数えない。
+ * 区切り線は前の組の最後の項目の ::after で、項目の行末側の padding の手前に置かれる（DeckControls.astro）。
+ * 擬似要素の位置は取れないので、項目の右端から padding と線の太さの半分を引いて、線の中央を求める
+ */
+const bandGapPoints = (band: Locator) =>
+	band.evaluate((root) => {
+		const nameOf = (button: HTMLButtonElement) => button.querySelector('.-visually-hidden')?.textContent ?? '?'
+		const visibleButtons = (menu: Element) =>
+			[...menu.querySelectorAll('button')].filter((button) => button.getClientRects().length > 0)
+		const centerY = (rect: DOMRect) => rect.top + rect.height / 2
+		const menus = [...root.querySelectorAll('menu')]
+		const points: { label: string; x: number; y: number }[] = []
+		for (const [index, menu] of menus.entries()) {
+			const buttons = visibleButtons(menu)
+			for (const [i, before] of buttons.entries()) {
+				const after = buttons[i + 1]
+				if (!after) continue
+				const a = before.getBoundingClientRect()
+				const b = after.getBoundingClientRect()
+				points.push({ label: `${nameOf(before)}と${nameOf(after)}の間`, x: (a.right + b.left) / 2, y: centerY(a) })
+			}
+			const nextMenu = menus[index + 1]
+			const last = buttons.at(-1)
+			const first = nextMenu ? visibleButtons(nextMenu)[0] : undefined
+			const item = last?.closest('li')
+			if (!last || !first || !item) continue
+			const a = last.getBoundingClientRect()
+			const b = first.getBoundingClientRect()
+			const separatorWidth = Number.parseFloat(getComputedStyle(item, '::after').borderLeftWidth)
+			const separatorX =
+				item.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(item).paddingRight) - separatorWidth / 2
+			const y = centerY(a)
+			points.push(
+				{ label: `${nameOf(last)}と区切り線の間`, x: (a.right + separatorX) / 2, y },
+				{ label: '区切り線の上', x: separatorX, y },
+				{ label: `区切り線と${nameOf(first)}の間`, x: (separatorX + b.left) / 2, y },
+			)
+		}
+		return points
+	})
+
+/**
+ * 点 point にポインターを動かし、その点が帯（band）の中のボタンの押せる範囲に当たることを確かめる。
+ * 当たったボタンのツールチップが出て、押せるボタンなら帯のハイライト（::before）も出ていることを確かめる。
+ * 押せないボタン（aria-disabled）にはハイライトを置かないので、ツールチップだけを確かめる
+ */
+const expectHoverOnBandPoint = async (page: Page, band: Locator, point: BandPoint) => {
+	await page.mouse.move(point.x, point.y)
+	// 操作の部分は、隠れている間（data-idle）はポインターを下のスライドに通すので、現れてから当たりを調べる
+	await expect(controls(page)).not.toHaveAttribute('data-idle')
+	const hit = await band.evaluate((root, { x, y }) => {
+		const element = document.elementFromPoint(x, y)
+		// 押せる範囲の ::after の上では、ボタン自身が返る
+		const button = element?.closest('button')
+		const buttons = [...root.querySelectorAll('button')]
+		return {
+			index: button ? buttons.indexOf(button) : -1,
+			isDisabled: button?.getAttribute('aria-disabled') === 'true',
+			found: element ? `${element.tagName.toLowerCase()}.${element.className}` : 'なし',
+		}
+	}, point)
+	expect(hit.index, `${point.label}（${point.x}, ${point.y}）で当たった要素: ${hit.found}`).toBeGreaterThanOrEqual(0)
+	await expect(band.locator('button').nth(hit.index).locator('._tooltip'), point.label).toHaveCSS('opacity', '1')
+	if (!hit.isDisabled) {
+		await expect
+			.poll(() => band.evaluate((element) => getComputedStyle(element, '::before').opacity), { message: point.label })
+			.toBe('1')
+	}
+}
+
+/** 帯（band）の、ボタンの間の隙間と区切り線のまわりのすべての点で、ハイライトとツールチップが消えないことを確かめる */
+const expectHoverAcrossBandGaps = async (page: Page, band: Locator) => {
+	const points = await bandGapPoints(band)
+	expect(points.length).toBeGreaterThan(0)
+	for (const point of points) {
+		// 前の点のホバーが移るのを待ってから、次の点に動かす
+		// oxlint-disable-next-line no-await-in-loop
+		await expectHoverOnBandPoint(page, band, point)
+	}
+	return points
+}
+
 test.describe('横長の画面', () => {
 	test.use({ viewport: LANDSCAPE })
 
@@ -215,7 +303,7 @@ test.describe('横長の画面', () => {
 	test('ノートの領域をクリックしても、スライドを移さない', async ({ page }) => {
 		await page.goto(`${DECK_PATH}#2`)
 		await page.keyboard.press('n')
-		const notes = slides(page).nth(1).locator('._notes')
+		const notes = slides(page).nth(1).locator(':scope > aside')
 		await expect(notes).toBeVisible()
 		// 次へ進む側（左の 3 分の 1 の外）をクリックする
 		const box = await notes.boundingBox()
@@ -227,11 +315,11 @@ test.describe('横長の画面', () => {
 	test('今のスライドのノートだけがキーボードでフォーカスでき、名前が付いている', async ({ page }) => {
 		await page.goto(DECK_PATH)
 		await page.keyboard.press('n')
-		const notes = slides(page).first().locator('._notes')
+		const notes = slides(page).first().locator(':scope > aside')
 		await expect(notes).toHaveAttribute('tabindex', '0')
 		await expect(notes).toHaveAccessibleName(`スピーカーノート（1 / ${TOTAL}）`)
 		// 今のスライドのほかは、Tab の止まる場所にしない
-		await expect(page.locator('main.deck > section.slide > ._notes[tabindex]')).toHaveCount(1)
+		await expect(page.locator('main.deck > section.slide > aside[tabindex]')).toHaveCount(1)
 		await notes.focus()
 		await expect(notes).toBeFocused()
 		// フォーカスしたノートの上のスペースは、ノートのスクロールに残し、スライドを移さない
@@ -241,15 +329,15 @@ test.describe('横長の画面', () => {
 		// 移ると、移った先のスライドのノートに付け替える
 		await page.keyboard.press('ArrowRight')
 		await expectCurrent(page, 2)
-		await expect(slides(page).nth(1).locator('._notes')).toHaveAttribute('tabindex', '0')
+		await expect(slides(page).nth(1).locator(':scope > aside')).toHaveAttribute('tabindex', '0')
 		await expect(notes).not.toHaveAttribute('tabindex')
-		await expect(page.locator('main.deck > section.slide > ._notes[tabindex]')).toHaveCount(1)
+		await expect(page.locator('main.deck > section.slide > aside[tabindex]')).toHaveCount(1)
 	})
 
 	test('ノートにフォーカスがあるときの Page Up / Page Down と Home / End は、スライドを移さない', async ({ page }) => {
 		await page.goto(`${DECK_PATH}#2`)
 		await page.keyboard.press('n')
-		const notes = slides(page).nth(1).locator('._notes')
+		const notes = slides(page).nth(1).locator(':scope > aside')
 		await notes.focus()
 		await page.keyboard.press('PageDown')
 		await page.keyboard.press('End')
@@ -306,9 +394,9 @@ test.describe('横長の画面', () => {
 
 	test('ノートを出すと、今のスライドのノートが見える', async ({ page }) => {
 		await page.goto(DECK_PATH)
-		await expect(slides(page).first().locator('._notes')).toBeHidden()
+		await expect(slides(page).first().locator(':scope > aside')).toBeHidden()
 		await page.keyboard.press('n')
-		await expect(slides(page).first().locator('._notes')).toBeVisible()
+		await expect(slides(page).first().locator(':scope > aside')).toBeVisible()
 	})
 
 	test('ボタンにフォーカスがあるときのスペースは、ボタンを押し、スライドを移さない', async ({ page }) => {
@@ -409,6 +497,18 @@ test.describe('横長の画面', () => {
 		expect(content).toMatch(/^""/)
 		// 矢印キーはスライドの移動に使うので、帯をツールバーにしない
 		await expect(controls(page).getByRole('toolbar')).toHaveCount(0)
+	})
+
+	test('ボタンの間の隙間と組の間の区切り線の上でも、どれかのボタンに当たり、ハイライトとツールチップが消えない', async ({
+		page,
+	}) => {
+		// 1 枚目では前へが押せず、ハイライトを置かないので、両端のボタンがどちらも押せる 2 枚目で試す
+		await page.goto(`${DECK_PATH}#2`)
+		// 操作の部分は、ポインターが動かないと隠れて押せなくなるので、先に動かして出しておく
+		await page.mouse.move(LANDSCAPE.width / 2, LANDSCAPE.height / 2)
+		await expect(controls(page)).not.toHaveAttribute('data-idle')
+		const points = await expectHoverAcrossBandGaps(page, controls(page))
+		expect(points.map(({ label }) => label)).toContain('区切り線の上')
 	})
 
 	test('全画面に対応していれば全画面のボタンを出し、対応していなければ出さない', async ({ page }) => {
@@ -515,8 +615,8 @@ test.describe('縦長の画面', () => {
 
 	test('ノートは Tab の止まる場所にしない', async ({ page }) => {
 		await page.goto(DECK_PATH)
-		await expect(page.locator('main.deck > section.slide > ._notes').first()).toBeVisible()
-		await expect(page.locator('main.deck > section.slide > ._notes[tabindex]')).toHaveCount(0)
+		await expect(page.locator('main.deck > section.slide > aside').first()).toBeVisible()
+		await expect(page.locator('main.deck > section.slide > aside[tabindex]')).toHaveCount(0)
 	})
 
 	// 縦に並べる形のノートは縦長の画面でだけ出るので、幅の広い場合も高さを幅より大きくする。
@@ -525,7 +625,7 @@ test.describe('縦長の画面', () => {
 		test(`幅 ${width}px で、ノートの左右の余白がページの余白になる`, async ({ page }) => {
 			await page.setViewportSize({ width, height: width + 400 })
 			await page.goto(DECK_PATH)
-			const notes = page.locator('.slide ._notes').first()
+			const notes = page.locator('.slide > aside').first()
 			await expect(notes).toBeVisible()
 			const { start, end } = await paddingInline(notes)
 			expect(start).toBeCloseTo(expectedPageGutter(width), 0)
@@ -535,7 +635,7 @@ test.describe('縦長の画面', () => {
 
 	test('ノートに面の色と上の辺の線が付く', async ({ page }) => {
 		await page.goto(DECK_PATH)
-		const notes = page.locator('.slide ._notes').first()
+		const notes = page.locator('.slide > aside').first()
 		await expect(notes).toBeVisible()
 		const surface = await resolveBackgroundToken(page, '--background--surface')
 		const base = await resolveBackgroundToken(page, '--background--base')
@@ -592,8 +692,8 @@ test.describe('発表者ビュー', () => {
 		await expect(slides(page).nth(1)).toHaveJSProperty('inert', false)
 		await expect(page.locator('main.deck > section.slide:not([hidden])')).toHaveCount(3)
 		// ノートを読むのは今のスライドだけなので、前と次のスライドのノートは Tab の止まる場所にしない
-		await expect(slides(page).nth(1).locator('._notes')).toHaveAttribute('tabindex', '0')
-		await expect(page.locator('main.deck > section.slide > ._notes[tabindex]')).toHaveCount(1)
+		await expect(slides(page).nth(1).locator(':scope > aside')).toHaveAttribute('tabindex', '0')
+		await expect(page.locator('main.deck > section.slide > aside[tabindex]')).toHaveCount(1)
 		// 発表者ビューでは、ノートを隠すボタンと、さらに発表者ビューを開くボタンを出さない
 		await expect(controls(page).locator('[data-action="notes"]')).toBeHidden()
 		await expect(controls(page).locator('[data-action="presenter"]')).toBeHidden()
@@ -629,7 +729,7 @@ test.describe('発表者ビュー', () => {
 				if (!found) throw new Error(`${selector} の位置が取れない`)
 				return found
 			}
-			const notes = await box('.slide[data-slide="current"] > ._notes')
+			const notes = await box('.slide[data-slide="current"] > aside')
 			const band = await box('.deck-controls')
 			const frames = await Promise.all(
 				['current', 'prev', 'next'].map((name) => box(`.slide[data-slide="${name}"] > ._frame`)),
@@ -662,7 +762,7 @@ test.describe('発表者ビュー', () => {
 			await page.setViewportSize(viewport)
 			await page.goto(`${DECK_PATH}?presenter#2`)
 			await expect(deck(page)).toHaveAttribute('data-view', 'presenter')
-			const notes = page.locator('.slide[data-slide="current"] > ._notes')
+			const notes = page.locator('.slide[data-slide="current"] > aside')
 			await expect(notes).toBeVisible()
 			const { start, end } = await paddingInline(notes)
 			expect(start).toBeCloseTo(expectedPageGutter(viewport.width), 0)
@@ -770,6 +870,22 @@ test.describe('発表者ビュー', () => {
 				await expect(button.locator('svg')).toHaveAttribute('aria-hidden', 'true')
 			}),
 		)
+	})
+
+	test('操作の部分とタイマーのボタンの間の隙間と区切り線の上でも、どれかのボタンに当たり、ハイライトとツールチップが消えない', async ({
+		page,
+	}) => {
+		await page.goto(`${DECK_PATH}?presenter#2`)
+		await expect(deck(page)).toHaveAttribute('data-view', 'presenter')
+		await page.mouse.move(LANDSCAPE.width / 2, LANDSCAPE.height / 2)
+		await expect(controls(page)).not.toHaveAttribute('data-idle')
+		const points = await expectHoverAcrossBandGaps(page, controls(page))
+		expect(points.map(({ label }) => label)).toContain('区切り線の上')
+
+		// 止まっている間は一時停止と停止が押せず、ハイライトを確かめられないので、再生して 2 つを押せる状態にする
+		await timerButton(page, '再生').click()
+		await expect(timerButton(page, '停止')).toHaveAttribute('aria-disabled', 'false')
+		await expectHoverAcrossBandGaps(page, page.locator('.presenter-timer ._controls'))
 	})
 
 	test('99 分を超えると、見える数字は 99:59 で止め、読み上げは実際の時間を伝える', async ({ page }) => {

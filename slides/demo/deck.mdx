@@ -8,19 +8,19 @@ title: コンテナスタイルクエリでカスタムプロパティをフラ�
 
 {/* コードの { } を式として読ませないよう、HTML の文字列で持つ */}
 {/* 枠に 2.5cqi の文字（DESIGN.md の code）で収まるよう、閾値の式は「閾値」と書いて短くする。実際の式はノートで話す */}
-export const cond = '<span class="-k">@container</span> (<span class="-s">閾値</span> &lt;= inline-size)'
+export const cond = '<span class="keyword">@container</span> (<span class="string">閾値</span> &lt;= inline-size)'
 export const scatteredCode = [`._layout    ${cond}`, `._thumbnail ${cond}`, `._title     ${cond}`].join('\n')
 
-{/* 印の行（.-mark）はブロックで描くので、その後ろに改行を置くと空の行が 1 つ増える。印の行だけ改行を付けない */}
+{/* 印の行（data-mark）はブロックで描くので、その後ろに改行を置くと空の行が 1 つ増える。印の行だけ改行を付けない */}
 export const flagLines = [
 	['._title {', false],
 	['  font-size: 小さい文字;', false],
-	['  <span class="-k">@container</span> <span class="-p">style(--_density: --spacious)</span> {', true],
+	['  <span class="keyword">@container</span> <span class="property">style(--_density: --spacious)</span> {', true],
 	['    font-size: 大きい文字;', false],
 	['  }', false],
 	['}', false],
 ]
-export const flagCode = flagLines.map(([text, mark]) => (mark ? `<span class="-mark">${text}</span>` : `${text}\n`)).join('')
+export const flagCode = flagLines.map(([text, mark]) => (mark ? `<span data-mark>${text}</span>` : `${text}\n`)).join('')
 
 <Slide layout="cover" chapter="CSS — 2026-11-12">
 	<Fragment slot="title">コンテナスタイルクエリで、カスタムプロパティをフラグにする</Fragment>
@@ -57,26 +57,26 @@ export const flagCode = flagLines.map(([text, mark]) => (mark ? `<span class="-m
 	<Fragment slot="title">幅を判定する場所と、読む場所を分ける</Fragment>
 	<ol class="flow">
 		<li>
-			<div class="flow-item -strong">
-				<span class="flow-label">1. 判定する場所</span>
-				<code class="flow-code">._layout</code>
-				<span class="flow-text">サイズクエリで幅を見る</span>
+			<div class="diagram-box" data-variant="strong">
+				<span class="diagram-label">1. 判定する場所</span>
+				<code class="diagram-code">._layout</code>
+				<span class="diagram-text">サイズクエリで幅を見る</span>
 			</div>
-			<span class="flow-arrow" aria-hidden="true">→</span>
+			<span class="diagram-arrow" aria-hidden="true">→</span>
 		</li>
 		<li>
-			<div class="flow-item">
-				<span class="flow-label">2. 伝えるフラグ</span>
-				<code class="flow-code">--_density</code>
-				<span class="flow-text">幅が広いと立てる</span>
+			<div class="diagram-box">
+				<span class="diagram-label">2. 伝えるフラグ</span>
+				<code class="diagram-code">--_density</code>
+				<span class="diagram-text">幅が広いと立てる</span>
 			</div>
-			<span class="flow-arrow" aria-hidden="true">→</span>
+			<span class="diagram-arrow" aria-hidden="true">→</span>
 		</li>
 		<li>
-			<div class="flow-item">
-				<span class="flow-label">3. 読む場所</span>
-				<code class="flow-code">style()</code>
-				<span class="flow-text">子孫が値を読む</span>
+			<div class="diagram-box">
+				<span class="diagram-label">3. 読む場所</span>
+				<code class="diagram-code">style()</code>
+				<span class="diagram-text">子孫が値を読む</span>
 			</div>
 		</li>
 	</ol>
@@ -96,12 +96,12 @@ export const flagCode = flagLines.map(([text, mark]) => (mark ? `<span class="-m
 	<Fragment slot="title">閾値は3か所から1か所になる</Fragment>
 	<div class="compare">
 		<div class="compare-item">
-			<span class="flow-label">Before / サイズクエリだけ</span>
+			<span class="diagram-label">Before / サイズクエリだけ</span>
 			<span class="compare-value">閾値 × 3</span>
 			<p>子要素ごとに同じ条件を書く</p>
 		</div>
-		<div class="compare-item -strong">
-			<span class="flow-label">After / フラグを読む</span>
+		<div class="compare-item" data-variant="strong">
+			<span class="diagram-label">After / フラグを読む</span>
 			<span class="compare-value">閾値 × 1</span>
 			<p>判定は1か所、ほかは値を読むだけ</p>
 		</div>
@@ -124,12 +124,12 @@ export const flagCode = flagLines.map(([text, mark]) => (mark ? `<span class="-m
 	<Fragment slot="title">値は<code>--</code>で始まる識別子に、初期値はクエリの外に</Fragment>
 	<div class="compare">
 		<div class="compare-item">
-			<span class="flow-label">避ける</span>
+			<span class="diagram-label">避ける</span>
 			<span class="compare-value"><code>1</code> / <code>true</code></span>
 			<p>書き間違えてもエラーにならず、条件が成り立たないだけ</p>
 		</div>
-		<div class="compare-item -strong">
-			<span class="flow-label">そろえる</span>
+		<div class="compare-item" data-variant="strong">
+			<span class="diagram-label">そろえる</span>
 			<span class="compare-value"><code>--true</code> / <code>--false</code></span>
 			<p>CSSのキーワードとぶつからない</p>
 		</div>
@@ -141,16 +141,16 @@ export const flagCode = flagLines.map(([text, mark]) => (mark ? `<span class="-m
 	<Fragment slot="title">2026年5月に、主要なブラウザがそろった</Fragment>
 	<ol class="timeline">
 		<li>
-			<span class="flow-label">Chrome / Edge 111</span>
-			<span class="flow-text">最初に対応</span>
+			<span class="diagram-label">Chrome / Edge 111</span>
+			<span class="diagram-text">最初に対応</span>
 		</li>
 		<li>
-			<span class="flow-label">Safari 18</span>
-			<span class="flow-text">続いて対応</span>
+			<span class="diagram-label">Safari 18</span>
+			<span class="diagram-text">続いて対応</span>
 		</li>
-		<li class="-strong">
-			<span class="flow-label">Firefox 151</span>
-			<span class="flow-text">Baselineになる</span>
+		<li data-variant="strong">
+			<span class="diagram-label">Firefox 151</span>
+			<span class="diagram-text">Baselineになる</span>
 		</li>
 	</ol>
 	<p slot="notes">対応状況です。ChromeとEdgeが111で最初に対応し、続いてSafariが18で対応しました。2026年5月にFirefoxが151で対応し、Baselineの「新しく利用可能」になりました。対応していないブラウザでは、style()の中のスタイルが当たらず、初期値の見た目が残ります。今日の例なら、狭い幅のときの見た目で表示されます。</p>

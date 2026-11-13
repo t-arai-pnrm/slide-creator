@@ -9,11 +9,11 @@ title: slide-creator の紹介
 {/* ノートの <p> は 1 行で書く。中で改行すると、MDX が中の文を段落として <p> で包み、<p> の中に <p> ができる */}
 
 export const commandCode = [
-	'<span class="-c"># 記事のURLか、マークダウンのパスを渡す</span>',
-	'<span class="-k">/create-slide</span> <span class="-s">https://example.com/article/</span>',
+	'<span class="comment"># 記事のURLか、マークダウンのパスを渡す</span>',
+	'<span class="keyword">/create-slide</span> <span class="string">https://example.com/article/</span>',
 	'',
-	'<span class="-c"># 発表の時間に合わせて枚数を決める</span>',
-	'<span class="-k">/create-slide</span> <span class="-s">./draft.md</span> <span class="-p">--minutes</span> 20',
+	'<span class="comment"># 発表の時間に合わせて枚数を決める</span>',
+	'<span class="keyword">/create-slide</span> <span class="string">./draft.md</span> <span class="property">--minutes</span> 20',
 ].join('\n')
 
 <Slide layout="cover" chapter="Tool — 2026-11-12">
@@ -37,23 +37,23 @@ export const commandCode = [
 	<Fragment slot="title">読む、書く、まとめる</Fragment>
 	<ol class="flow">
 		<li>
-			<div class="flow-item">
-				<span class="flow-label">1. 読む</span>
-				<span class="flow-text">記事の要点を拾う</span>
+			<div class="diagram-box">
+				<span class="diagram-label">1. 読む</span>
+				<span class="diagram-text">記事の要点を拾う</span>
 			</div>
-			<span class="flow-arrow" aria-hidden="true">→</span>
+			<span class="diagram-arrow" aria-hidden="true">→</span>
 		</li>
 		<li>
-			<div class="flow-item">
-				<span class="flow-label">2. 書く</span>
-				<span class="flow-text">原稿にする</span>
+			<div class="diagram-box">
+				<span class="diagram-label">2. 書く</span>
+				<span class="diagram-text">原稿にする</span>
 			</div>
-			<span class="flow-arrow" aria-hidden="true">→</span>
+			<span class="diagram-arrow" aria-hidden="true">→</span>
 		</li>
 		<li>
-			<div class="flow-item -strong">
-				<span class="flow-label">3. まとめる</span>
-				<span class="flow-text">HTMLにビルドする</span>
+			<div class="diagram-box" data-variant="strong">
+				<span class="diagram-label">3. まとめる</span>
+				<span class="diagram-text">HTMLにビルドする</span>
 			</div>
 		</li>
 	</ol>
@@ -77,27 +77,27 @@ export const commandCode = [
 <Slide chapter="02 — Design">
 	<Fragment slot="title">見た目はすべてDESIGN.mdから決まる</Fragment>
 	<div class="tree">
-		<div class="tree-root figure-box -strong">
-			<span class="flow-label">値の出どころ</span>
-			<span class="flow-code">DESIGN.md</span>
+		<div class="tree-root diagram-box" data-variant="strong">
+			<span class="diagram-label">値の出どころ</span>
+			<span class="diagram-code">DESIGN.md</span>
 		</div>
 		<div class="tree-children">
 			<div>
-				<div class="figure-box">
-					<span class="flow-label">トークン</span>
-					<span class="flow-text">色、文字、余白</span>
+				<div class="diagram-box">
+					<span class="diagram-label">トークン</span>
+					<span class="diagram-text">色、文字、余白</span>
 				</div>
 			</div>
 			<div>
-				<div class="figure-box">
-					<span class="flow-label">レイアウト</span>
-					<span class="flow-text">11種類</span>
+				<div class="diagram-box">
+					<span class="diagram-label">レイアウト</span>
+					<span class="diagram-text">11種類</span>
 				</div>
 			</div>
 			<div>
-				<div class="figure-box">
-					<span class="flow-label">定型の図</span>
-					<span class="flow-text">5種類</span>
+				<div class="diagram-box">
+					<span class="diagram-label">定型の図</span>
+					<span class="diagram-text">5種類</span>
 				</div>
 			</div>
 		</div>
@@ -109,12 +109,12 @@ export const commandCode = [
 	<Fragment slot="title">原稿を直すだけで済む</Fragment>
 	<div class="compare">
 		<div class="compare-item">
-			<span class="flow-label">手で作る</span>
+			<span class="diagram-label">手で作る</span>
 			<span class="compare-value">1枚ずつ組む</span>
 			<p>見た目の判断が毎回いる</p>
 		</div>
-		<div class="compare-item -strong">
-			<span class="flow-label">/create-slide</span>
+		<div class="compare-item" data-variant="strong">
+			<span class="diagram-label">/create-slide</span>
 			<span class="compare-value">原稿を直す</span>
 			<p>見た目はテーマが決める</p>
 		</div>
@@ -141,14 +141,14 @@ export const commandCode = [
 <Slide chapter="02 — Present">
 	<Fragment slot="title">同じHTMLを、横長の画面では1枚ずつ映す</Fragment>
 	<div class="before-after">
-		<div class="figure-box">
-			<span class="flow-label">Before</span>
-			<span class="flow-text">縦に並べて読むだけ</span>
+		<div class="diagram-box">
+			<span class="diagram-label">Before</span>
+			<span class="diagram-text">縦に並べて読むだけ</span>
 		</div>
-		<span class="flow-arrow" aria-hidden="true">→</span>
-		<div class="figure-box -strong">
-			<span class="flow-label">After</span>
-			<span class="flow-text">1枚ずつ映して発表する</span>
+		<span class="diagram-arrow" aria-hidden="true">→</span>
+		<div class="diagram-box" data-variant="strong">
+			<span class="diagram-label">After</span>
+			<span class="diagram-text">1枚ずつ映して発表する</span>
 		</div>
 	</div>
 	<p slot="notes">最初のテーマには、スライドを縦に並べて読む形しかありませんでした。今は同じHTMLのまま、JavaScriptが動く横長の画面では、1枚ずつ映す発表の表示に切り替わります。矢印キーやスペースで進み、Nキーでノートを出し、Fキーで全画面にできます。縦長の画面とJavaScriptが動かない環境では、これまでどおり縦に並べた形で読めます。</p>
@@ -160,15 +160,15 @@ export const commandCode = [
 		<blockquote>
 			<p>スライドは読ませるものではなく、見せるもの。話し手の説明はスピーカーノートに書く。</p>
 		</blockquote>
-		<figcaption class="flow-label">DESIGN.mdの概要</figcaption>
+		<figcaption class="diagram-label">DESIGN.mdの概要</figcaption>
 	</figure>
 	<p slot="notes">DESIGN.mdの概要には、スライドを作るときの原則を並べていて、これはその最初の1つです。ほかに、1枚に1つの主張を置く、文章は1枚に5行まで、並ぶ項目は箇条書きにせず図にする、といった決まりがあります。スライドに書けない説明は、捨てずにスピーカーノートに残します。今話している内容も、このスライドのノートに書いてあるものです。</p>
 </Slide>
 
 <Slide layout="number" chapter="02 — Output">
 	<Fragment slot="title">デッキ1本を1つのページで配る</Fragment>
-	<div class="number-block">
-		<span class="numbers-value">1</span>
+	<div class="number-figure">
+		<span class="number-value">1</span>
 		<p>URLを渡せば、ブラウザで読める</p>
 	</div>
 	<p slot="notes">できあがるのは、デッキ1本につき1つのHTMLです。発表のあとにURLを渡せば、聞いてくれた人が、あとから一人で読み返せます。スマートフォンのような縦長の画面では、スライドが縦に並び、各スライドの下にスピーカーノートが出ます。スライドに載せなかった説明も、文章として一緒に読めます。</p>
@@ -178,20 +178,20 @@ export const commandCode = [
 	<Fragment slot="title">見た目の決まりから先に作っている</Fragment>
 	<ol class="timeline">
 		<li>
-			<span class="flow-label">PR #1</span>
-			<span class="flow-text">DESIGN.mdを書く</span>
+			<span class="diagram-label">PR #1</span>
+			<span class="diagram-text">DESIGN.mdを書く</span>
 		</li>
 		<li>
-			<span class="flow-label">PR #2</span>
-			<span class="flow-text">テーマと枠を作る</span>
+			<span class="diagram-label">PR #2</span>
+			<span class="diagram-text">テーマと枠を作る</span>
 		</li>
-		<li class="-strong">
-			<span class="flow-label">Now</span>
-			<span class="flow-text">発表の表示を足す</span>
+		<li data-variant="strong">
+			<span class="diagram-label">Now</span>
+			<span class="diagram-text">発表の表示を足す</span>
 		</li>
 		<li>
-			<span class="flow-label">Next</span>
-			<span class="flow-text">記事から原稿を作る</span>
+			<span class="diagram-label">Next</span>
+			<span class="diagram-text">記事から原稿を作る</span>
 		</li>
 	</ol>
 	<p slot="notes">今の進み具合です。最初のPRでDESIGN.mdを書き、色や文字の値を先に決めました。次のPRで、その値を写したテーマと16:9の枠を作りました。今は、1枚ずつ映す発表の表示を足しています。記事から原稿を作る/create-slideは、まだこの先の段階で、別の作業として作っています。</p>

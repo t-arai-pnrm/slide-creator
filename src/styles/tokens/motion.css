@@ -2,6 +2,7 @@
  * イージングと再生時間のトークン（motion-tokens）。値は DESIGN.md の「動き」の表を写す。
  * 現れる・消える動きは out-quint、画面の上で動かすものは in-out-quint、ホバーで色が変わるような
  * その場で値が変わるだけの変化は hover（CSS の ease）にする。
+ * hover は、値に強さと方向を表す名前がないので、用途の名前にしている（motion-tokens）。
  *
  * @example
  * transition-duration: var(--duration--base);

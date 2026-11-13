@@ -93,8 +93,22 @@ import Icon from '@/components/Icon.astro'
 			/* 帯の内側の余白。ボタンの角丸も、帯の角丸からこの値を引いて求める（DESIGN.md の「操作の部分」） */
 			--_band-padding: 0.25rem;
 
-			/* ボタンの間。隙間を作らず、各項目（li）の左右に半分ずつ持たせる（no-gaps-between-hover-items） */
+			/* ボタンの間。隙間は、両側のボタンが半分ずつ押せる範囲として持つ（pseudo-hit-area-no-overlap） */
 			--_button-gap: 0.125rem;
+
+			/* 組の間の線の太さ。線の上を押せる範囲として持つ、前の組の最後のボタンの計算にも使う */
+			--_separator-width: 1px;
+
+			/* ボタンの状態ごとの色（state-suffix-for-custom-properties）。値は DESIGN.md の「操作の部分」 */
+			--_foreground: var(--foreground--muted);
+			--_foreground--hocus: var(--foreground--base);
+			--_foreground--pressed: var(--foreground--base);
+			--_foreground--disabled: var(--foreground--disabled);
+
+			/* ふだんは線を見せない。押した状態で線の色だけを変え、太さを変えずに済むよう、透明な線を置いておく */
+			--_border-color: transparent;
+			--_border-color--pressed: var(--border--base);
+			--_background--pressed: var(--background--base);
 
 			/* 帯の中のボタンを、ポインターかキーボードのフォーカスが指しているか（hocus-via-style-query） */
 			--_has-hocus: --false;
@@ -102,10 +116,7 @@ import Icon from '@/components/Icon.astro'
 			/* キーボードのフォーカスが帯の中のボタンにあるか。ハイライトとツールチップを動かさずに切り替えるのに使う */
 			--_has-focus-visible: --false;
 
-			/*
-			 * ハイライトの包含ブロックにする。発表の表示では、置く側の Deck.astro の position: fixed が勝ち、
-			 * それも包含ブロックを作るので、どちらの表示でもハイライトは帯を基準に置かれる
-			 */
+			/* ハイライト（::before）の包含ブロックにする */
 			position: relative;
 
 			/* 帯は 1 つだけだが、アンカーの名前がほかの部品に届かないよう、範囲を帯の中に限る（anchor-scope-for-repeated-components） */
@@ -121,10 +132,7 @@ import Icon from '@/components/Icon.astro'
 				'--buttons' auto
 				'--progress-line' auto
 				/ auto;
-
-			/* 左右は、端のボタンの項目が持つボタンの間の半分を引き、上下と同じ余白に見せる */
-			padding-block: var(--_band-padding);
-			padding-inline: calc(var(--_band-padding) - var(--_button-gap) / 2);
+			padding: var(--_band-padding);
 			border: 1px solid var(--border--base);
 			border-radius: var(--rounded--control);
 			background-color: var(--background--surface);
@@ -164,10 +172,10 @@ import Icon from '@/components/Icon.astro'
 			}
 
 			/*
-			 * ボタンの間の隙間と線の上も、その項目（li）の上として数え、ハイライトを消さない。
+			 * ボタンの間の隙間と線の上は、ボタンの押せる範囲（::after）に含まれるので、ボタンのホバーとして数え、ハイライトを消さない。
 			 * 無効のボタンにはハイライトを置かない
 			 */
-			&:has(> ._buttons li:hover > button:enabled:not([aria-disabled='true'])) {
+			&:has(> ._buttons button:enabled:not([aria-disabled='true']):hover) {
 				@media (any-hover) {
 					--_has-hocus: --true;
 				}
@@ -206,25 +214,25 @@ import Icon from '@/components/Icon.astro'
 						transition-duration: var(--duration--base);
 						transition-property: opacity;
 						transition-timing-function: var(--ease--out-quint);
+					}
 
-						/* ボタンの間を滑らせるのは、動きを減らす設定がないときだけにする（motion-only-with-no-preference） */
-						@container style(--_has-hocus: --true) {
-							@media (prefers-reduced-motion: no-preference) {
-								transition-property: inset, opacity;
-								transition-timing-function: var(--ease--in-out-quint), var(--ease--out-quint);
-							}
-						}
-
-						/*
-						 * ポインターが帯を出たら、薄れ終わるまで最後のボタンの位置に留める。
-						 * アンカーを失った inset は auto に戻るので、離散的な切り替えを step-end で時間の終わりまで遅らせる。
-						 * allow-discrete はこの状態に入るときだけにし、帯の外から入ったときは、前の位置から滑らせずにその場に出す
-						 */
-						@container style(--_has-hocus: --false) {
+					/* ボタンの間を滑らせるのは、動きを減らす設定がないときだけにする（motion-only-with-no-preference） */
+					@container style(--_has-focus-visible: --false) and style(--_has-hocus: --true) {
+						@media (prefers-reduced-motion: no-preference) {
 							transition-property: inset, opacity;
-							transition-timing-function: step-end, var(--ease--out-quint);
-							transition-behavior: allow-discrete;
+							transition-timing-function: var(--ease--in-out-quint), var(--ease--out-quint);
 						}
+					}
+
+					/*
+					 * ポインターが帯を出たら、薄れ終わるまで最後のボタンの位置に留める。
+					 * アンカーを失った inset は auto に戻るので、離散的な切り替えを step-end で時間の終わりまで遅らせる。
+					 * allow-discrete はこの状態に入るときだけにし、帯の外から入ったときは、前の位置から滑らせずにその場に出す
+					 */
+					@container style(--_has-focus-visible: --false) and style(--_has-hocus: --false) {
+						transition-property: inset, opacity;
+						transition-timing-function: step-end, var(--ease--out-quint);
+						transition-behavior: allow-discrete;
 					}
 				}
 			}
@@ -259,46 +267,61 @@ import Icon from '@/components/Icon.astro'
 			display: block flex;
 		}
 
-		/* 組の中のボタンは数が決まっていて、帯の 1 行に収まるので、折り返さない */
+		/*
+		 * 組の中のボタンは数が決まっていて、帯の 1 行に収まるので、折り返さない。
+		 * ボタンの間の隙間は、両側のボタンの押せる範囲（::after）が半分ずつ覆うので、
+		 * ポインターが隙間を通る間もどれかのボタンの上にある（pseudo-hit-area-no-overlap）
+		 */
 		menu {
 			display: block flex;
+			column-gap: var(--_button-gap);
 		}
 
-		/*
-		 * ボタンの間は、項目の左右の padding で作り、ポインターが隙間を通る間もどれかの項目の上にあるようにする（no-gaps-between-hover-items）。
-		 * 発表者ビューで隠すボタンの項目は、隙間だけが残らないよう、項目ごと並びから外す
-		 */
-		menu > li {
-			padding-inline: calc(var(--_button-gap) / 2);
-
+		li {
+			/* 発表者ビューで隠すボタンの項目は、隙間だけが残らないよう、項目ごと並びから外す */
 			&:has(> button[hidden]) {
 				display: none;
 			}
-		}
 
-		/*
-		 * 移動と表示の切り替えの組の間に、短い縦の細い線を引く（DESIGN.md の「操作の部分」）。
-		 * 組は 2 つで、折り返さないので、前の組の最後の項目（次へ。隠すことはない）の擬似要素で描く（separators-in-gap の例外）。
-		 * 線の上も項目の中なので、ポインターが線の上を通ってもハイライトは消えない。
-		 * 押した状態の面が線に接しないよう、線の両側に帯の内側の余白と同じ間を取る
-		 * （右側は、後ろの組の最初の項目が持つボタンの間の半分と合わせる）
-		 */
-		menu:has(+ menu) > li:last-child {
-			display: block flex;
-			column-gap: var(--_band-padding);
-			align-items: center;
-			padding-inline-end: calc(var(--_band-padding) - var(--_button-gap) / 2);
+			/*
+			 * 移動と表示の切り替えの組の間に、短い縦の細い線を引く（DESIGN.md の「操作の部分」）。
+			 * 組は 2 つで、折り返さないので、前の組の最後の項目（次へ。隠すことはない）の擬似要素で描く（separators-in-gap の例外）。
+			 * 押した状態の面が線に接しないよう、線の両側に帯の内側の余白と同じ間を取る
+			 */
+			&:last-child:is(menu:has(+ menu) > *) {
+				display: block flex;
+				column-gap: var(--_band-padding);
+				align-items: center;
+				padding-inline-end: var(--_band-padding);
+			}
 
-			&::after {
+			&:last-child:is(menu:has(+ menu) > *)::after {
 				content: '';
 				block-size: 1rem;
-				border-inline-start: 1px solid var(--border--base);
+				border-inline-start: var(--_separator-width) solid var(--border--base);
 			}
 		}
 
 		button {
 			/* 押せる部分の大きさ。文字と一緒に大きくし、CSS ピクセルの下限も併せて書く（hit-area-min-size） */
 			--_hit-size: max(24px, 24 / 16 * 1rem);
+
+			/*
+			 * 枠線の太さ。押せる範囲（::after）はパディングボックスから測るので、広げる幅に足す。
+			 * 足さないと、::after の端が枠線の外側の辺で止まり、隙間が覆われない
+			 */
+			--_border-width: 1px;
+
+			/* 押せる範囲（::after）を、ボタンの外の行頭側と行末側へ広げる幅。ふだんは、どちらもボタンの間の半分 */
+			--_hit-extend-inline-start: calc(var(--_button-gap) / 2);
+			--_hit-extend-inline-end: calc(var(--_button-gap) / 2);
+
+			/*
+			 * ツールチップの左右の位置。ふだんはボタンの中央にそろえる。
+			 * 動かさないので、中央に寄せる translate は描き直しの負荷にならない
+			 */
+			--_tooltip-inset-inline: 50% auto;
+			--_tooltip-translate: -50% 0;
 
 			/* ボタンを、ポインターかキーボードのフォーカスが指しているか。ツールチップが読む（hocus-via-style-query） */
 			--_is-hocus: --false;
@@ -324,27 +347,52 @@ import Icon from '@/components/Icon.astro'
 			min-block-size: var(--_hit-size);
 			aspect-ratio: 1;
 
-			/*
-			 * ふだんは線を見せない。押した状態で線の色だけを変え、太さを変えずに済むよう、透明な線を置いておく。
-			 * 強制カラーモードでは線が見えるよう、none ではなく透明にする
-			 */
-			border-color: transparent;
+			/* 強制カラーモードでは線が見えるよう、none ではなく透明にする（色はルートの --_border-color） */
+			border-width: var(--_border-width);
+			border-color: var(--_border-color);
 
 			/* 帯とボタンの角が同じ中心の円弧になるよう、帯の角丸から内側の余白を引く */
 			border-radius: calc(var(--rounded--control) - var(--_band-padding));
-			color: var(--foreground--muted);
+			color: var(--_foreground);
 
 			@media (any-pointer: coarse) {
 				--_hit-size: max(44px, 44 / 16 * 1rem);
 			}
 
-			/* 押せないボタン（disabled、aria-disabled）は、ホバーで色を変えない */
-			@media (any-hover) {
-				&:enabled:not([aria-disabled='true']):hover {
-					color: var(--foreground--base);
-				}
+			/*
+			 * 押せる範囲を、見た目の面を変えずに、ボタンの間の隙間まで広げる（pseudo-hit-area-no-overlap）。
+			 * 隣のボタンとは隙間の中央で接し、重ならない。ボタンの押せる範囲なので、隙間の上もボタンのホバーになる。
+			 * ハイライトとツールチップは、ボタン自身の大きさと位置に合わせるので、広げた範囲の影響を受けない
+			 */
+			&::after {
+				content: '';
+				position: absolute;
+				inset-block: 0;
+				inset-inline: calc((var(--_border-width) + var(--_hit-extend-inline-start)) * -1)
+					calc((var(--_border-width) + var(--_hit-extend-inline-end)) * -1);
+			}
 
-				&:enabled:hover {
+			/*
+			 * 前の組の最後のボタン（次へ）は、組の間の線の両側の間と線の上まで押せる範囲を広げ、
+			 * ポインターが線の上を通ってもハイライトを消さない。
+			 * 後ろの組の最初に見えるボタンは、発表者ビューでノートを隠すと替わるので、どのボタンでも同じ行頭側の幅（ボタンの間の半分）のままにし、
+			 * 次へがその残りを持つ。両方とも枠線の太さを足して測るので、2 つの範囲は重ならずに接する
+			 */
+			&:is(menu:has(+ menu) > li:last-child > *) {
+				--_hit-extend-inline-end: calc(var(--_band-padding) * 2 + var(--_separator-width) - var(--_button-gap) / 2);
+			}
+
+			/* 押せないボタン（disabled、aria-disabled）は、ホバーで色を変えず、ハイライトも置かない */
+			&:enabled:not([aria-disabled='true']):hover {
+				@media (any-hover) {
+					anchor-name: --deck-controls-hocus;
+					color: var(--_foreground--hocus);
+				}
+			}
+
+			/* ツールチップの名前は、押せないボタン（aria-disabled）にも出す */
+			&:enabled:hover {
+				@media (any-hover) {
 					--_is-hocus: --true;
 				}
 			}
@@ -377,25 +425,16 @@ import Icon from '@/components/Icon.astro'
 				--_is-focus-visible: --true;
 			}
 
-			&:focus-visible:not(:disabled, [aria-disabled='true']) {
-				color: var(--foreground--base);
-			}
-
-			/* ハイライトは、ホバーしている項目かキーボードのフォーカスがある、押せるボタンに重ねる */
-			&:enabled:not([aria-disabled='true']):is(menu > li:hover > *) {
-				@media (any-hover) {
-					anchor-name: --deck-controls-hocus;
-				}
-			}
-
+			/* ハイライトは、ホバーしているかキーボードのフォーカスがある、押せるボタンに重ねる */
 			&:enabled:not([aria-disabled='true']):focus-visible {
 				anchor-name: --deck-controls-hocus;
+				color: var(--_foreground--hocus);
 			}
 
 			&[aria-pressed='true'] {
-				border-color: var(--border--base);
-				background-color: var(--background--base);
-				color: var(--foreground--base);
+				border-color: var(--_border-color--pressed);
+				background-color: var(--_background--pressed);
+				color: var(--_foreground--pressed);
 
 				/*
 				 * 強制カラーモードでは、作者の面の色が消え、押した状態が線だけになって分かりにくい。
@@ -412,19 +451,28 @@ import Icon from '@/components/Icon.astro'
 			&:is(:disabled, [aria-disabled='true']) {
 				--icon--forced-color: GrayText;
 
-				color: oklch(from var(--foreground--muted) l c h / 50%);
+				color: var(--_foreground--disabled);
+			}
+
+			/*
+			 * 帯の右端のボタン（表示の切り替えの組の最後。隠すことはない）だけは、画面の右端からはみ出さないよう、
+			 * ツールチップの右端をボタンの右端にそろえる。帯は横書きで並ぶので、右端は行の終わり（inline-end）になる
+			 */
+			&:is(menu:last-child > li:last-child > *) {
+				--_tooltip-inset-inline: auto 0;
+				--_tooltip-translate: none;
 			}
 
 			/*
 			 * ツールチップは、ボタンの中央の下に出す。発表の表示では帯は枠の上端にあるので、上ではなく下に出す。
 			 * ボタンを包含ブロックにした絶対配置で置き、アンカーポジショニングに対応しない環境でも同じ位置に出す
-			 * （no-unsupported-layout-features）。動かさないので、中央に寄せる translate は描き直しの負荷にならない
+			 * （no-unsupported-layout-features）
 			 */
 			& > ._tooltip {
 				position: absolute;
+				inset-inline: var(--_tooltip-inset-inline);
 				inset-block-start: calc(100% + 0.375rem);
-				inset-inline-start: 50%;
-				translate: -50% 0;
+				translate: var(--_tooltip-translate);
 
 				/*
 				 * 置く側が帯を画面の下の端に置くとき（発表者ビュー）は、ボタンの上に出す。
@@ -433,15 +481,6 @@ import Icon from '@/components/Icon.astro'
 				@container style(--_tooltip-side: --block-start) {
 					inset-block: auto calc(100% + 0.375rem);
 				}
-			}
-
-			/*
-			 * 帯の右端のボタン（表示の切り替えの組の最後。隠すことはない）だけは、画面の右端からはみ出さないよう、
-			 * ツールチップの右端をボタンの右端にそろえる。帯は横書きで並ぶので、右端は行の終わり（inline-end）になる
-			 */
-			&:is(menu:last-child > li:last-child > *) > ._tooltip {
-				inset-inline: auto 0;
-				translate: none;
 			}
 		}
 

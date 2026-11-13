@@ -15,7 +15,7 @@ argument-hint: "[作業の内容]"
 | 探す係 | `explorer` | haiku・low | ファイル、行、抜粋の一覧。結論は出さない |
 | 作る係 | `builder` | opus・medium | `src/` のコード、`e2e/` のブラウザのテスト、`scripts/` のスクリプト |
 | CSS の各係 | css-change のスキル | 読む係 haiku、実装係 opus・medium、判断する係 opus・high | CSS |
-| レビュー係 | `reviewer` | fable・medium | ブランチの差分全体の判定。読むだけ |
+| レビュー係 | `reviewer` | fable・high | ブランチの差分全体の判定。読むだけ |
 | 助言役 | `/advisor fable` | fable | 会話の全文を読んで助言する。難しいタスクのときだけ、ユーザーがそのセッションで有効にする |
 
 Fable を使うのはレビュー係と、ユーザーが有効にした助言役だけにする。サブスクリプションでは、Fable は週の利用枠を Opus より速く使い、使えるのも枠の一部に限られるため。

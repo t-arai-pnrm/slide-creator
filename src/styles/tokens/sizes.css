@@ -1,5 +1,5 @@
 /**
- * スライドの外の、画面の幅で決める大きさのトークン。値は DESIGN.md の「画面の端」の表を写す。
+ * 画面の幅で決める大きさと、枠の比率のトークン。値は DESIGN.md の「画面の端」の表と「枠」を写す。
  * ページの左右の余白は、taklog のページの余白と同じ値にする。
  *
  * @example
@@ -33,4 +33,12 @@
 	 */
 	--gutter--page-start: max(var(--gutter--page), env(safe-area-inset-left));
 	--gutter--page-end: max(var(--gutter--page), env(safe-area-inset-right));
+
+	/*
+	 * スライドの枠の縦横比。スライドと、枠の位置を計算する操作の部分で同じ値を使う（DESIGN.md の「枠」）
+	 */
+	--aspect-ratio--frame: 16 / 9;
+
+	/* 発表の表示でノートを出したときに、ノートの領域にする画面の高さの割合 */
+	--ratio--notes: 0.3;
 }

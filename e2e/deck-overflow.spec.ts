@@ -25,7 +25,7 @@ for (const slug of slugs) {
 			(frames, ratio) =>
 				frames.map((frame, index) => {
 					const inner = frame.querySelector('._frame-inner')
-					const heading = frame.querySelector('._heading')
+					const heading = frame.querySelector(':scope > ._frame-inner > hgroup')
 					const body = frame.querySelector('._body')
 					const pageNumber = frame.querySelector('._page')
 					if (!inner || !heading || !body || !pageNumber) throw new Error(`${index + 1} 枚目の枠の部品が足りない`)

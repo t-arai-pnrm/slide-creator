@@ -36,6 +36,18 @@
 	--color--green--400: oklch(73.4% 0.111 163.1deg);
 	--color--green--700: oklch(47.3% 0.088 164.8deg);
 
+	/*
+	 * コードの色分けと、削除した行の - に使う色。紙の色に馴染むよう彩度を抑える
+	 */
+	--color--blue--300: oklch(78% 0.075 245deg);
+	--color--blue--700: oklch(47% 0.09 250deg);
+	--color--rust--300: oklch(79% 0.08 55deg);
+	--color--rust--700: oklch(50% 0.11 45deg);
+	--color--violet--300: oklch(79% 0.07 305deg);
+	--color--violet--700: oklch(47% 0.1 305deg);
+	--color--red--400: oklch(70% 0.13 25deg);
+	--color--red--600: oklch(52% 0.15 25deg);
+
 	/* ==----------------------------------------------------
 	 * 役割
 	 * ---------------------------------------------------- */
@@ -53,6 +65,15 @@
 	 */
 	--foreground--base: light-dark(var(--color--ink--950), var(--color--sand--150));
 	--foreground--muted: light-dark(var(--color--sand--600), var(--color--sand--300));
+
+	/*
+	 * 操作の部分の押せないボタンのアイコン。ふだんのアイコンが muted なので、半分の不透明度にして押せないことを示す。
+	 * light-dark() を持つ foreground--muted からではなく、同じプリミティブから派生させ、ブラウザごとの解決をそろえる
+	 */
+	--foreground--disabled: light-dark(
+		oklch(from var(--color--sand--600) l c h / 50%),
+		oklch(from var(--color--sand--300) l c h / 50%)
+	);
 
 	/* 9:1 に届かないので、文字の色には使わず、線や枠のような文字でない部品にだけ使う */
 	--accent--base: light-dark(var(--color--green--700), var(--color--green--400));
@@ -76,22 +97,39 @@
 	 * 地の文字（foreground）を除き、基準は 4.5:1 にしている
 	 * （text-contrast-aa）。比は DESIGN.md の表にあり、
 	 * 値を変えたら計算し直す。
+	 * 強調した行の背景を重ねても 4.5:1 を保つため、色分けの色はプリミティブより
+	 * ライトで暗く（l - 0.06）、ダークで明るく（l + 0.02）する（derive-colors-from-base）。
 	 * comment は区切り記号にも、keyword は関数名にも、
 	 * string は定数にも使う
 	 */
 	--syntax--foreground: var(--foreground--base);
-	--syntax--comment: light-dark(oklch(44.1% 0.013 84.6deg), oklch(76% 0.012 89.8deg));
-	--syntax--keyword: light-dark(oklch(41% 0.1 305deg), oklch(81% 0.07 305deg));
-	--syntax--tag: light-dark(oklch(41.3% 0.088 164.8deg), oklch(75.4% 0.111 163.1deg));
-	--syntax--property: light-dark(oklch(41% 0.09 250deg), oklch(80% 0.075 245deg));
-	--syntax--string: light-dark(oklch(44% 0.11 45deg), oklch(81% 0.08 55deg));
+	--syntax--comment: light-dark(
+		oklch(from var(--color--sand--600) calc(l - 0.06) c h),
+		oklch(from var(--color--sand--300) calc(l + 0.02) c h)
+	);
+	--syntax--keyword: light-dark(
+		oklch(from var(--color--violet--700) calc(l - 0.06) c h),
+		oklch(from var(--color--violet--300) calc(l + 0.02) c h)
+	);
+	--syntax--tag: light-dark(
+		oklch(from var(--color--green--700) calc(l - 0.06) c h),
+		oklch(from var(--color--green--400) calc(l + 0.02) c h)
+	);
+	--syntax--property: light-dark(
+		oklch(from var(--color--blue--700) calc(l - 0.06) c h),
+		oklch(from var(--color--blue--300) calc(l + 0.02) c h)
+	);
+	--syntax--string: light-dark(
+		oklch(from var(--color--rust--700) calc(l - 0.06) c h),
+		oklch(from var(--color--rust--300) calc(l + 0.02) c h)
+	);
 
 	/*
 	 * 追加した行と削除した行の左端の + と -。色だけで示さず、文字の形でも見分けられるようにする
 	 * （no-color-only-information）
 	 */
 	--syntax--ins: light-dark(var(--color--green--700), var(--color--green--400));
-	--syntax--del: light-dark(oklch(52% 0.15 25deg), oklch(70% 0.13 25deg));
+	--syntax--del: light-dark(var(--color--red--600), var(--color--red--400));
 
 	/*
 	 * 強調した行の背景。追加した行と削除した行には重ねない。
