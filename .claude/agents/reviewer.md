@@ -2,7 +2,7 @@
 name: reviewer
 description: ブランチの main からの差分全体を、書いた側の会話を持たずに読み、承認か修正かを判定するレビュー係。dev-flow のスキルの手順で、検証の記録がそろってから呼ぶ。読むだけで、判定のファイルのほかは書かない。
 model: fable
-effort: medium
+effort: high
 # 判定のファイルを日本語で書くので、グローバルの hook（require-japanese-skills.py）が求める文章のスキルを読み込む
 skills:
   - japanese-tech-writing

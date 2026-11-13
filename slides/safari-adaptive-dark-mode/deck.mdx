@@ -1,0 +1,298 @@
+---
+title: Safari 27.3 betaの「適応型ダークモード」で、未対応のサイトが受ける影響と対策
+---
+
+{/* taklog の記事「Safari 27.3 betaの「適応型ダークモード」で、ダークモード未対応のサイトが受ける影響と対策」から作った原稿 */}
+{/* ノートの <p> は 1 行で書く。中で改行すると、MDX が中の文を段落として <p> で包み、<p> の中に <p> ができる */}
+
+import imageYahoo from './images/01-image_safari-adaptive-dark-mode_screenshot01.jpg'
+import imageRyuGaGotoku from './images/02-image_safari-adaptive-dark-mode_screenshot02.jpg'
+
+{/* コードの < > を要素として読ませないよう、HTML の文字列で持つ */}
+export const metaCode = (value) =>
+	`<span class="keyword">&lt;meta</span> <span class="property">name</span>=<span class="string">"color-scheme"</span> <span class="property">content</span>=<span class="string">"${value}"</span> <span class="keyword">/&gt;</span>`
+export const lightDarkCode = metaCode('light dark')
+export const lightOnlyCode = metaCode('light only')
+
+<Slide layout="cover" chapter="2026-11-13">
+	<Fragment slot="title">「適応型ダークモード」で、未対応のサイトが受ける影響と対策</Fragment>
+	<p>TAK</p>
+	<p slot="notes">Safari 27.3 betaで、「適応型ダークモード」という新しい機能が登場しました。英語の名前はAdaptive Dark Modeです。今日は、この機能がダークモードに対応していないサイトの表示をどう変えるのか、そして制作者がcolor-schemeの宣言をどう選べばよいのかを話します。最後に、自分のサイトで確かめる箇所を持ち帰ってもらえればと思います。</p>
+</Slide>
+
+<Slide layout="statement" chapter="01 — 何が起きるか">
+	<Fragment slot="title">ダークモードに対応していないサイトも、Safariが自動で暗くする</Fragment>
+	<p>ユーザーが有効にすると、背景色、文字色、SVG、グラデーションなどを解析して変換する。</p>
+	<p slot="notes">まず、この機能が何をするのかです。ユーザーが適応型ダークモードを有効にすると、サイトがダークモードに対応していなくても、Safariが背景色や文字色、SVG、グラデーションなどを解析し、自動でダークモードに変換します。求めていた人には朗報です。ただ、ユーザーの設定しだいで見た目が変わるので、既存のサイトの制作者にも影響が及ぶ可能性があります。</p>
+</Slide>
+
+<Slide layout="number" chapter="01 — 何が起きるか">
+	<Fragment slot="title">ダークモードに対応したページの読み込みは約10%</Fragment>
+	<div class="number-figure">
+		<span class="number-value">10%</span>
+		<p>ダークモードのユーザーによる読み込みは約40%（WebKitの記事）</p>
+	</div>
+	<p slot="notes">なぜSafariがこの機能を入れたのかは、WebKitの記事の数字から分かります。Webのページの読み込みのうち、約40%はダークモードのユーザーによるものです。ところが、ダークモードに対応したページの読み込みは約10%にとどまります。この差を埋め、Web全体で一貫した暗い表示を提供することが、この機能の目的とされています。</p>
+</Slide>
+
+<Slide chapter="01 — 何が起きるか">
+	<Fragment slot="title">外観がダークなら、Safariのほうから提案される</Fragment>
+	<ol class="flow">
+		<li>
+			<div class="diagram-box">
+				<span class="diagram-label">1</span>
+				<span class="diagram-text">システムの外観をダークにする</span>
+			</div>
+			<span class="diagram-arrow" aria-hidden="true">→</span>
+		</li>
+		<li>
+			<div class="diagram-box">
+				<span class="diagram-label">2</span>
+				<span class="diagram-text">背景の明るいサイトを開く</span>
+			</div>
+			<span class="diagram-arrow" aria-hidden="true">→</span>
+		</li>
+		<li>
+			<div class="diagram-box">
+				<span class="diagram-label">3</span>
+				<span class="diagram-text">プレビューが提案される</span>
+			</div>
+			<span class="diagram-arrow" aria-hidden="true">→</span>
+		</li>
+		<li>
+			<div class="diagram-box" data-variant="strong">
+				<span class="diagram-label">4</span>
+				<span class="diagram-text">「Try」で有効になる</span>
+			</div>
+		</li>
+	</ol>
+	<p slot="notes">では、ユーザーはどうやってこの機能を有効にするのでしょうか。システムの外観をダークにした状態で、背景の明るいサイトを開くと、Safariが適応型ダークモードのプレビューを提案します。そこで「Try」を選ぶと有効になります。今はbeta版だけなので、この先どうなるかは分かりません。ただ、外観をダークにするだけという緩い条件で提案されるので、Safariの設定に疎いユーザーにも広まる可能性が高い、と私は見ています。</p>
+</Slide>
+
+<Slide chapter="02 — 変換の仕組み">
+	<Fragment slot="title">色相を保ったまま、明度だけを反転する</Fragment>
+	<div class="before-after">
+		<div class="diagram-box">
+			<span class="diagram-label">Before</span>
+			<span class="diagram-text">明るい背景と暗い文字</span>
+		</div>
+		<span class="diagram-arrow" aria-hidden="true">→</span>
+		<div class="diagram-box" data-variant="strong">
+			<span class="diagram-label">After</span>
+			<span class="diagram-text">暗い背景と明るい文字</span>
+			<span class="diagram-text">文字のコントラスト比は4.5:1が目標（保証はない）</span>
+		</div>
+	</div>
+	<p slot="notes">では、有効にしたとき、Safariはページの色をどう変えるのでしょうか。単純な色の反転ではありません。CSSで定義された色をそのまま反転するのではなく、色相を保ったまま明度を反転するカラーマトリクスで変換します。明るい背景は暗く、暗い文字は明るくなります。テキストはWCAGのコントラスト比4.5:1を目標に調整されますが、必ず満たすと保証されているわけではありません。また、ダークモードへの対応を宣言していないページでは、Safariがページの色から全体が明るいか暗いかを推定し、原則として明るいページだけを暗く変換します。もともと暗い背景に明るい文字のページなら、何も変化は起こらないようです。</p>
+</Slide>
+
+<Slide chapter="02 — 変換の仕組み">
+	<Fragment slot="title">画像とcanvasは変換しない。SVGと白黒のロゴは変換されることがある</Fragment>
+	<div class="compare">
+		<div class="compare-item">
+			<span class="diagram-label">変換しない</span>
+			<span class="compare-value">写真などの画像、canvas</span>
+			<p>基本的にそのまま表示する</p>
+		</div>
+		<div class="compare-item" data-variant="strong">
+			<span class="diagram-label">変換されることがある</span>
+			<span class="compare-value">SVG、白黒のロゴ</span>
+			<p>暗い背景ではコントラストが足りなくなる</p>
+		</div>
+	</div>
+	<p slot="notes">色はこう変わりますが、ページの中には変換しないものもあります。写真などの画像は、基本的にそのまま表示します。canvasの内容も変換されません。canvasに描かれる内容は幅が広く、予測できないためです。一方で、背景が暗くなると、アイコンやロゴの多くはコントラストが足りなくなります。そこで、SVG画像は中の色を調べて必要に応じて変換し、ビットマップ画像はピクセルのヒストグラムを解析して、単純な白黒のロゴなら反転します。</p>
+</Slide>
+
+<Slide chapter="02 — 変換の仕組み">
+	<Fragment slot="title">Yahoo! JAPANは、自然に読める表示になった</Fragment>
+	<figure class="slide-image">
+		<img
+			src={imageYahoo.src}
+			width={imageYahoo.width}
+			height={imageYahoo.height}
+			alt="適応型ダークモードで表示したYahoo! JAPANのトップページ。背景は暗く、文字は明るくなり、ロゴやアイコン、写真は元の色で表示されている"
+		/>
+		<figcaption>適応型ダークモードで表示したYahoo! JAPAN</figcaption>
+	</figure>
+	<p slot="notes">実際のサイトではどう見えるのか、私がSafari 27.3 betaで確かめました。Yahoo! JAPANのトップページは、比較的自然で読みやすい表示になりました。背景は暗く、文字は明るく変換され、ロゴやアイコン、ニュースの写真は元の色のまま残っています。ただし、どのサイトでもこうなるわけではありません。背景に画像を敷いているページはうまく変換されないことがあり、その例はあとで見ます。</p>
+</Slide>
+
+<Slide chapter="03 — color-schemeの宣言">
+	<Fragment slot="title"><code>light dark</code>を宣言したサイトは変換されない</Fragment>
+	<figure class="code-figure">
+		<figcaption class="code-label">HTML</figcaption>
+		<pre class="code-block" set:html={lightDarkCode} />
+	</figure>
+	<p slot="notes">では、変換の対象から外れるのはどんなサイトでしょうか。すでにダークモードに対応し、color-schemeでlight darkを宣言しているサイトは、適応型ダークモードの対象になりません。宣言は、このようにHTMLのmeta要素で書いても、CSSで書いても構いません。</p>
+</Slide>
+
+<Slide chapter="03 — color-schemeの宣言">
+	<Fragment slot="title">宣言はCSSより<code>&lt;meta&gt;</code>で書く</Fragment>
+	<div class="compare">
+		<div class="compare-item">
+			<span class="diagram-label">CSSで書く</span>
+			<span class="compare-value">背景がちらつく</span>
+			<p>読み込みの途中で、背景が白や黒にちらつくことがある</p>
+		</div>
+		<div class="compare-item" data-variant="strong">
+			<span class="diagram-label">HTMLで書く</span>
+			<span class="compare-value"><code>&lt;meta&gt;</code>はCSSを待たない</span>
+			<p>最初の描画で配色が切り替わるのを抑えられる</p>
+		</div>
+	</div>
+	<p slot="notes">どちらでもよいとはいえ、私はmeta要素で書くことを勧めています。CSSで書くと、ブラウザはCSSを読み込んで解析するまでページの配色を決められず、読み込みの途中で背景が白や黒にちらつく可能性があるためです。meta要素ならCSSを待たずに配色を伝えられるので、最初の描画で配色が切り替わるのを抑えられます。CSSを読み込めなかったときも、背景色とスクロールバーやフォーム部品の配色がユーザーの設定に従います。</p>
+</Slide>
+
+<Slide layout="statement" chapter="03 — color-schemeの宣言">
+	<Fragment slot="title">未対応のサイトでは<code>light dark</code>を宣言しない</Fragment>
+	<p>背景色を指定せず、暗い文字色だけを指定していると、暗くなった背景に暗い文字が載り、読めなくなる。</p>
+	<p slot="notes">宣言すれば変換されないなら、未対応のサイトでもlight darkを書けばよいと考えたくなります。しかし、それはしてはいけません。この宣言は「このページはダークモードの配色にも対応している」という意味なので、OSの外観がダークのとき、ブラウザはページの既定の背景色と文字色を暗い配色のシステムカラーにします。文字色だけを暗い色で指定し、背景色を指定していなければ、暗い背景に暗い文字が載って読めなくなります。フォーム部品やスクロールバーも暗く描かれ、明るいデザインの中で浮きます。自分で書いた覚えがなくても、海外製のリセットCSSやフレームワークがlight darkを宣言していることがあるので、未対応のサイトはCSSを確かめて、この宣言を取り除いておきましょう。</p>
+</Slide>
+
+<Slide chapter="03 — color-schemeの宣言">
+	<Fragment slot="title">明るいままにしたいなら<code>light only</code>を宣言する</Fragment>
+	<figure class="code-figure">
+		<figcaption class="code-label">HTML</figcaption>
+		<pre class="code-block" set:html={lightOnlyCode} />
+	</figure>
+	<p slot="notes">では、未対応のサイトは何を書けばよいのでしょうか。背景が明るいサイトなら、color-schemeは何も指定しなくて構いません。ただ、ダークモードに対応する予定がなく、適応型ダークモードの変換も避けて明るい表示のままにしたいときは、light onlyを宣言します。こちらもCSSで書けますが、ここではmeta要素の例を載せています。</p>
+</Slide>
+
+<Slide layout="statement" chapter="03 — color-schemeの宣言">
+	<Fragment slot="title">ただしbeta 1では、<code>only</code>で変換を抑えられない</Fragment>
+	<p>Safari 27.3 beta 1の時点の話。いつ対応するかは示されていないので、今後のbetaで確かめる。</p>
+	<p slot="notes">ここで1つ注意があります。Safari 27.3 beta 1では、onlyによる適応型ダークモードの変換の抑止は、まだ対応していません。つまりbeta 1では、light onlyを宣言しても変換は止まりません。いつ対応するかは示されていないので、今後のbetaで対応状況を確かめる必要があります。</p>
+</Slide>
+
+<Slide chapter="04 — 起きうる問題">
+	<Fragment slot="title">明るい背景画像の上の文字が読めなくなる</Fragment>
+	<figure class="slide-image">
+		<img
+			src={imageRyuGaGotoku.src}
+			width={imageRyuGaGotoku.width}
+			height={imageRyuGaGotoku.height}
+			alt="適応型ダークモードで表示した龍が如くポータルのニュースの一覧。明るい背景画像はそのままで、記事の題名や日付の文字が明るく変換され、背景に同化して読みにくくなっている"
+		/>
+		<figcaption>適応型ダークモードで表示した龍が如くポータル</figcaption>
+	</figure>
+	<p slot="notes">宣言で変換を止められないなら、変換されたときに何が起きるかを知っておく必要があります。最初は、さきほど後回しにした背景画像の例です。WebKitの記事によると、大半の画像は変換されません。画像の上の文字の見やすさも考慮するとされていますが、明るい背景画像がそのままで、上の文字だけが明るく変換されると、コントラストが足りなくなることがあります。龍が如くポータルのニュースの一覧では、記事の題名や日付が明るい色に変換され、背景画像に同化してほとんど読めなくなりました。文字を載せる背景を画像で描いているサイトは、表示を確かめておきましょう。</p>
+</Slide>
+
+<Slide chapter="04 — 起きうる問題">
+	<Fragment slot="title">ブレンド、マスク、canvas、焼き込んだ背景色は影響を受けやすい</Fragment>
+	<ul class="flow">
+		<li>
+			<div class="diagram-box">
+				<span class="diagram-label">ブレンド</span>
+				<code class="diagram-code">mix-blend-mode</code>
+				<span class="diagram-text">効果が無効になることがある</span>
+			</div>
+		</li>
+		<li>
+			<div class="diagram-box">
+				<span class="diagram-label">マスク</span>
+				<span class="diagram-text">効果が無効になることがある</span>
+			</div>
+		</li>
+		<li>
+			<div class="diagram-box">
+				<span class="diagram-label">描画</span>
+				<code class="diagram-code">&lt;canvas&gt;</code>
+				<span class="diagram-text">明るいまま残る</span>
+			</div>
+		</li>
+		<li>
+			<div class="diagram-box">
+				<span class="diagram-label">焼き込んだ背景色</span>
+				<span class="diagram-text">白い四角に見えることがある</span>
+			</div>
+		</li>
+	</ul>
+	<p slot="notes">背景画像のほかにも、影響を受けやすい使い方が4つあります。1つ目はmix-blend-mode、2つ目はCSSのマスクです。色を変換した要素にこれらをかけると意図しない結果になることがあるので、適応型ダークモードはこれらの効果を無効にする場合があります。3つ目はcanvasで、内容は変換されないので、描いたグラフなどが暗くなった周りの中で明るいまま表示されます。4つ目は、白い背景のロゴ画像を白い背景に置くような、背景色を焼き込んだ画像で、暗い背景の上に白い四角が浮いて見えることがあります。SVGだけが変換され、隣のビットマップ画像と配色が揃わない、といったことも起こりえます。</p>
+</Slide>
+
+<Slide layout="statement" chapter="04 — 起きうる問題">
+	<Fragment slot="title">JavaScriptからは変換前の色しか取れず、検出もできない</Fragment>
+	<p><code>getComputedStyle()</code>は、制作者が書いた元の色を返す。</p>
+	<p slot="notes">canvasの食い違いは、CSSの色を読み取って描く実装でさらに大きくなります。getComputedStyle()などでCSSの色を取得すると、変換後の色ではなく、制作者が書いた元の色が返ります。そのため、CSSの色を読み取ってcanvasに描いている実装では、HTMLとcanvasの色がさらに食い違います。また、適応型ダークモードが適用されているかどうかを、JavaScriptから検出することもできません。検出できるとフィンガープリンティングに使える情報が増えるので、プライバシーの観点から隠されています。</p>
+</Slide>
+
+<Slide chapter="04 — 起きうる問題">
+	<Fragment slot="title">WebKitが勧めるのは、画像ではなくCSSとSVGで描くこと</Fragment>
+	<ul class="flow">
+		<li>
+			<div class="diagram-box">
+				<span class="diagram-label">ロゴ</span>
+				<span class="diagram-text">ロゴとアイコンをSVGにする</span>
+			</div>
+		</li>
+		<li>
+			<div class="diagram-box">
+				<span class="diagram-label">背景</span>
+				<span class="diagram-text">CSSの単色かグラデーションにする</span>
+			</div>
+		</li>
+		<li>
+			<div class="diagram-box">
+				<span class="diagram-label">部品</span>
+				<span class="diagram-text">角丸、影、ボタンの状態をCSSで描く</span>
+			</div>
+		</li>
+		<li>
+			<div class="diagram-box">
+				<span class="diagram-label">画像</span>
+				<span class="diagram-text">透過した背景で作る</span>
+			</div>
+		</li>
+		<li>
+			<div class="diagram-box">
+				<span class="diagram-label">余白</span>
+				<span class="diagram-text">コンテナにpaddingを足す</span>
+			</div>
+		</li>
+	</ul>
+	<p slot="notes">適応型ダークモードでの見た目を良くするために、WebKitの記事は5つの対応を勧めています。ビットマップのロゴやアイコンをSVGにすること。背景にタイル状の画像を敷かず、CSSの単色やグラデーションを使うこと。角丸、影、ボタンの状態を、画像のスプライトではなくCSSで描くこと。コンテンツの画像は、ページの背景色を焼き込まず、透過した背景で作ること。そして、コンテナにpaddingを足し、要素が詰まらないようにすることです。</p>
+</Slide>
+
+<Slide layout="statement" chapter="05 — どうするか">
+	<Fragment slot="title">対応は必須ではないが、「何もしない」の意味は変わった</Fragment>
+	<p>ユーザーが有効にしていれば、何も指定しないサイトはSafariが暗く変換する可能性がある。</p>
+	<p slot="notes">ここまで聞くと、そもそもダークモードに対応すべきなのか、と考えた人もいると思います。対応の必要性や効果は、ユーザーや利用環境によって異なります。私は、よく挙げられる理由を検討したうえで、ダークモードへの対応は必須ではなく、ダークモードを好むユーザーや、ダークモードのほうが見やすい環境に応える選択肢の一つだと考えています。ただし、適応型ダークモードの登場で、対応しないことの意味は変わります。ユーザーがこの機能を有効にしていれば、何も指定しないサイトはSafariによって暗く変換される可能性があります。</p>
+</Slide>
+
+<Slide chapter="05 — どうするか">
+	<Fragment slot="title">Safari 27.3で確かめ、変換を受け入れるか抑えるかを決める</Fragment>
+	<div class="tree">
+		<div class="tree-root diagram-box" data-variant="strong">
+			<span class="diagram-label">まず</span>
+			<span class="diagram-text">Safari 27.3で表示を確かめる</span>
+		</div>
+		<div class="tree-children">
+			<div>
+				<div class="diagram-box">
+					<span class="diagram-label">崩れない</span>
+					<span class="diagram-text">変換に任せる</span>
+				</div>
+			</div>
+			<div>
+				<div class="diagram-box">
+					<span class="diagram-label">崩れて、直す余裕がない</span>
+					<code class="diagram-code">light only</code>
+				</div>
+			</div>
+			<div>
+				<div class="diagram-box">
+					<span class="diagram-label">余裕がある</span>
+					<span class="diagram-text">ダークモードに対応</span>
+				</div>
+			</div>
+		</div>
+	</div>
+	<p slot="notes">では、制作者は何をすればよいのでしょうか。まず、既存のサイトもSafari 27.3で表示を確かめます。特にmix-blend-mode、マスク、canvas、背景色を焼き込んだ画像を使っているサイトは影響を受けやすくなります。崩れなければ、変換に任せる選択肢があります。オリジナルのデザインをフルスクラッチで作る制作では、ライトとダークの両方に対応するのはデザイナーのコストの面でも厳しいので、ブラウザを信用して配色の変更を任せるほうがよいかもしれない、と私は考えています。崩れて直す余裕がなければ、light onlyの宣言を検討します。ただし、light onlyを明示すると、ユーザーが求めている機能を無効にすることになる懸念がありますし、beta 1ではまだ効きません。余裕があれば、color-schemeやprefers-color-schemeを使って自分でダークモードに対応するのが、いちばん確実です。</p>
+</Slide>
+
+<Slide layout="end" chapter="Thank you">
+	<Fragment slot="title">Safari 27.3 betaの「適応型ダークモード」で、ダークモード未対応のサイトが受ける影響と対策</Fragment>
+	<p>TAK / <a href="https://www.tak-dcxi.com/article/safari-adaptive-dark-mode/">www.tak-dcxi.com/article/safari-adaptive-dark-mode/</a></p>
+	<p slot="notes">この発表は、私が書いた記事「Safari 27.3 betaの「適応型ダークモード」で、ダークモード未対応のサイトが受ける影響と対策」をもとにしています。明らかに変換がうまくいっていないサイトを見つけたら、Feedback Assistantで報告できます。サイトの制作者は、web-evangelist@apple.com に相談することもできるそうです。今日扱わなかった細かい書き方は、記事のほうで確かめてください。ご清聴ありがとうございました。</p>
+</Slide>
