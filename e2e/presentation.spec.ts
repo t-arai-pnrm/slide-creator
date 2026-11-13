@@ -3,7 +3,7 @@
 // 見本のデッキ（slides/sample/deck.mdx）は、最後の 1 枚にだけリンクがある
 import { readFileSync } from 'node:fs'
 
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 
 import { countSlides } from '../scripts/vite-plugin-slide-numbers.ts'
 
@@ -51,6 +51,34 @@ const expectTimerDigits = async (page: Page, values: readonly number[]) => {
 		)
 		.toEqual(values.map(String))
 }
+
+/**
+ * ページの左右の余白（DESIGN.md の「画面の端」の gutter--page）の、画面の幅 width での値（px）。
+ * 375px 以下で 16px、1280px 以上で 64px、その間は幅に比例する。
+ * CSS の式（progress()）が無効になると padding が 0 に落ちても気付けないので、CSS から読まずにここで計算する
+ */
+const expectedPageGutter = (width: number) => 16 + 48 * Math.min(Math.max((width - 375) / (1280 - 375), 0), 1)
+
+/** 要素の左右の padding の計算値（px） */
+const paddingInline = (target: Locator) =>
+	target.evaluate((element) => {
+		const style = getComputedStyle(element)
+		return { start: Number.parseFloat(style.paddingLeft), end: Number.parseFloat(style.paddingRight) }
+	})
+
+/**
+ * :root のトークン（色）を background-color に入れたときの計算値。
+ * 色の値をテストに書くと、トークンを変えるたびにテストも直すことになるので、ページの中で解決する
+ */
+const resolveBackgroundToken = (page: Page, token: string) =>
+	page.evaluate((name) => {
+		const probe = document.createElement('div')
+		probe.style.backgroundColor = `var(${name})`
+		document.body.append(probe)
+		const value = getComputedStyle(probe).backgroundColor
+		probe.remove()
+		return value
+	}, token)
 
 test.describe('横長の画面', () => {
 	test.use({ viewport: LANDSCAPE })
@@ -491,6 +519,35 @@ test.describe('縦長の画面', () => {
 		await expect(page.locator('main.deck > section.slide > ._notes[tabindex]')).toHaveCount(0)
 	})
 
+	// 縦に並べる形のノートは縦長の画面でだけ出るので、幅の広い場合も高さを幅より大きくする。
+	// セーフエリア（env(safe-area-inset-*)）は Playwright では 0 なので、ページの余白のほうが選ばれる
+	for (const width of [375, 828, 1280, 1920]) {
+		test(`幅 ${width}px で、ノートの左右の余白がページの余白になる`, async ({ page }) => {
+			await page.setViewportSize({ width, height: width + 400 })
+			await page.goto(DECK_PATH)
+			const notes = page.locator('.slide ._notes').first()
+			await expect(notes).toBeVisible()
+			const { start, end } = await paddingInline(notes)
+			expect(start).toBeCloseTo(expectedPageGutter(width), 0)
+			expect(end).toBe(start)
+		})
+	}
+
+	test('ノートに面の色と上の辺の線が付く', async ({ page }) => {
+		await page.goto(DECK_PATH)
+		const notes = page.locator('.slide ._notes').first()
+		await expect(notes).toBeVisible()
+		const surface = await resolveBackgroundToken(page, '--background--surface')
+		const base = await resolveBackgroundToken(page, '--background--base')
+		const documentBackground = await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor)
+		// 面の色が枠の外の色と同じだと、色が付いたかどうかを見分けられない
+		expect(surface).not.toBe(base)
+		await expect(notes).toHaveCSS('background-color', surface)
+		expect(surface).not.toBe(documentBackground)
+		await expect(notes).toHaveCSS('border-top-width', '1px')
+		await expect(notes).toHaveCSS('border-top-style', 'solid')
+	})
+
 	test('#3 で開くと 3 枚目までスクロールし、ハッシュを変えるとそのスライドまでスクロールする', async ({ page }) => {
 		await page.goto(`${DECK_PATH}#3`)
 		await expect(slides(page).nth(2)).toBeInViewport()
@@ -591,6 +648,25 @@ test.describe('発表者ビュー', () => {
 			// 前と次は今のスライドの下に、間を 1rem 以上空けて並ぶ
 			expect(prev.y).toBeGreaterThanOrEqual(current.y + current.height + rem - 1)
 			expect(next.x).toBeGreaterThanOrEqual(prev.x + prev.width + rem - 1)
+		})
+	}
+
+	// 発表者ビューでは、画面の端の余白とセーフエリアを body の余白で取るので、ノートはページの余白だけにする
+	for (const viewport of [
+		{ width: 375, height: 812 },
+		{ width: 828, height: 1200 },
+		{ width: 1280, height: 800 },
+		{ width: 1920, height: 1080 },
+	]) {
+		test(`${viewport.width}×${viewport.height} で、ノートの左右の余白がページの余白になる`, async ({ page }) => {
+			await page.setViewportSize(viewport)
+			await page.goto(`${DECK_PATH}?presenter#2`)
+			await expect(deck(page)).toHaveAttribute('data-view', 'presenter')
+			const notes = page.locator('.slide[data-slide="current"] > ._notes')
+			await expect(notes).toBeVisible()
+			const { start, end } = await paddingInline(notes)
+			expect(start).toBeCloseTo(expectedPageGutter(viewport.width), 0)
+			expect(end).toBe(start)
 		})
 	}
 
