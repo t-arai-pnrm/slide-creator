@@ -83,12 +83,65 @@ const { title } = Astro.props
 		 * 子が読むフラグと値を body で宣言する。子の配置のネストは、それを var() とスタイルクエリで読むだけにする
 		 * （is-for-ancestor-context、nest-own-states-only、placement-via-public-flag）。
 		 * スタイルクエリは親の値を問い合わせる。._timer と ._controls の親は body で、スライドの親の .deck は body から値を継承する。
-		 * body の内部プロパティは .deck と .slide にも継承されるので、Slide.astro の内部プロパティと重ならない名前にする
+		 * body の内部プロパティは .deck と .slide にも継承されるので、Slide.astro の内部プロパティと重ならない名前にする。
+		 * 帯の上端までの長さと、それを求める値だけは、文書のルート（html）のスクロールの余白でも使うので、html で宣言する。
+		 *
+		 * html で宣言する長さは、DESIGN.md の rem の値を em で書く。WebKit は、html の規則の中の rem を、html の文字の大きさ
+		 * （画面の幅で 11px〜16px に変わる）ではなく 16px で計算するため（375×812 で、スクロールの余白が帯の上端より約 19px 大きくなった）。
+		 * html の em は html の文字の大きさなので、どのブラウザでも rem で書くつもりの値になる。
+		 * これらは登録していないカスタムプロパティで、em は var() で読む要素の文字の大きさで解決される。
+		 * 読む要素（html、._controls、.slide、ノートの aside）は、どれも文字の大きさが文書のルートと同じ（aside の notes は 1rem）なので、
+		 * body より下でも rem と同じ値になる。読む要素を足すときや、ノートの文字の大きさを変えるときは、この前提を確かめる
 		 */
+		html {
+			/* 発表の表示で枠の上の辺と右の辺から、縦に並べて読む形で画面の下の端から離す距離（DESIGN.md の「操作の部分」の 1rem） */
+			--_controls-inset: 1em;
+
+			/*
+			 * 縦に並べて読む形で、最後のスライドの下に空ける長さを求めるための、帯の高さ。
+			 * 帯の中身の高さは DeckControls が決めるが、子の大きさは置く側から読めないので、DESIGN.md の「操作の部分」の値から求める。
+			 * ボタンの高さは、2.25rem と押せる部分の大きさ（マウスで 24px 以上、タッチで 44px 以上）の大きいほう。
+			 * マウスの 24px（1.5rem）は 2.25rem を超えないので、タッチのときだけ比べる（hit-area-min-size の値）。
+			 * 帯の高さは、ボタンの高さに、帯の内側の余白（上下の 0.25rem）、帯の枠（上下の細い線）、進み具合の線（細い線）を足したもの。
+			 * DESIGN.md の「操作の部分」の値を変えたら、ここも変える。rem の値は、上に書いた理由で em で書く
+			 */
+			--_controls-button-block-size: 2.25em;
+			--_controls-band-block-size: calc(var(--_controls-button-block-size) + 0.25em * 2 + 1px * 3);
+
+			/*
+			 * 縦に並べて読む形で、画面の下の端から帯の上端までの長さ。帯は、セーフエリアにいつもの距離を足した位置に、帯の高さで置く。
+			 * 最後のスライドの下に空ける長さ（.deck で渡す --slide--stack-end-space）と、下のスクロールの余白で使う
+			 */
+			--_controls-stack-end-space: calc(
+				env(safe-area-inset-bottom) + var(--_controls-inset) + var(--_controls-band-block-size)
+			);
+
+			@media (any-pointer: coarse) {
+				--_controls-button-block-size: max(2.25em, 44px, 44 / 16 * 1em);
+			}
+
+			/*
+			 * 縦に並べて読む形で操作の部分を出しているときは、スクロールで見せる範囲から、画面の下に固定した帯の分を除く。
+			 * フォーカスした要素が帯に隠れないようにし、1 画面ずつ送る量からも帯の分を除く（scroll-padding-for-targets）。
+			 * スクロールの余白は、ページをスクロールさせるルートに書くので、デッキの状態をルートから :has() で読む。
+			 * ページ全体の状態で、ルートのほかに起点がないため、起点をルートにし、引数を > で絞る（has-narrow-anchor の例外）。
+			 * 条件は、下の body の --_is-stacked-view とそろえる。片方を変えたら、もう片方も変える
+			 */
+			&:has(> body > .deck:not([data-view])[data-notes]) {
+				@media screen {
+					scroll-padding-block-end: var(--_controls-stack-end-space);
+				}
+			}
+		}
+
 		body {
-			/* 発表の表示か、発表者ビューか。経過時間、操作の部分、スライドの配置が読む */
+			/*
+			 * 発表の表示か、発表者ビューか、操作の部分を出して縦に並べて読む形か。経過時間、操作の部分、スライドの配置が読む。
+			 * 縦に並べて読む形でも、JavaScript が動かないとき（data-notes がない）は操作の部分を出さないので、--_is-stacked-view は --false のまま
+			 */
 			--_is-present-view: --false;
 			--_is-presenter-view: --false;
+			--_is-stacked-view: --false;
 
 			/*
 			 * 発表の表示で、操作の部分を今のスライドの枠の右上に重ねるための値。
@@ -107,11 +160,19 @@ const { title } = Astro.props
 			--_controls-frame-inline-size: min(100%, var(--_controls-stage-block-size) * var(--aspect-ratio--frame));
 			--_controls-frame-block-size: min(var(--_controls-stage-block-size), 100svi / (var(--aspect-ratio--frame)));
 
-			/* 枠の上の辺と右の辺から離す距離（DESIGN.md の「操作の部分」） */
-			--_controls-inset: 1rem;
-
 			&:has(> .deck[data-view='present']) {
 				--_is-present-view: --true;
+			}
+
+			/*
+			 * 縦に並べて読む形で、スクリプトが動き、操作の部分を出しているとき（DESIGN.md の「操作の部分」）。
+			 * スクリプトは、このときだけ data-view なしで data-notes を付ける。
+			 * 印刷の間も縦に並べて読む形になるが、操作の部分は出さないので、画面に限る
+			 */
+			&:has(> .deck:not([data-view])[data-notes]) {
+				@media screen {
+					--_is-stacked-view: --true;
+				}
 			}
 
 			&:has(> .deck[data-view='present'][data-notes='shown']) {
@@ -182,6 +243,23 @@ const { title } = Astro.props
 
 					justify-self: start;
 				}
+
+				/*
+				 * 縦に並べて読む形では、画面の下の中央に固定する。親指で届き、左右どちらの手でも押せるため。
+				 * 画面の下の端から浮かせて置くので、いつもの距離にセーフエリアを足す（safe-area-fixed-bottom、safe-area-combine-with-max）。
+				 * 左右はセーフエリアの内側に収め、その間の中央に、帯の幅を中身の幅のままで置く（absolute-centering-with-margin-auto）。
+				 * 左右のいつもの距離は 0 なので、セーフエリアと比べる。
+				 * ツールチップは、下に出すと画面の外にはみ出すので、ボタンの上に出す（placement-via-public-flag）
+				 */
+				@container style(--_is-stacked-view: --true) {
+					--deck-controls--tooltip-side: --block-start;
+
+					position: fixed;
+					inset-inline: max(0px, env(safe-area-inset-left)) max(0px, env(safe-area-inset-right));
+					inset-block-end: calc(var(--_controls-inset) + env(safe-area-inset-bottom));
+					inline-size: fit-content;
+					margin-inline: auto;
+				}
 			}
 
 			/*
@@ -200,6 +278,17 @@ const { title } = Astro.props
 
 		.deck {
 			/*
+			 * 縦に並べて読む形で操作の部分を出しているときは、最後のスライドの下を、画面の下の端に固定した帯に重ならない分まで空ける
+			 * （DESIGN.md の「画面の端」と「操作の部分」）。長さは、画面の下の端から帯の上端まで（html の --_controls-stack-end-space）。
+			 * この .deck で公開プロパティを宣言し、継承でスライドに渡す（placement-via-public-flag）。
+			 * どのスライドで使うか（最後のスライド）と、空ける場所（ノートの内側の余白か、スライドの内側の余白か）は Slide.astro が決める。
+			 * スタイルクエリは、.deck の親の body に問い合わせる。セーフエリアの分もこの長さに含め、スライドの側で二重に空けない
+			 */
+			@container style(--_is-stacked-view: --true) {
+				--slide--stack-end-space: var(--_controls-stack-end-space);
+			}
+
+			/*
 			 * 紙に出すときは、画面の配色にかかわらずライトにする。
 			 * color は :root で画面の配色のまま計算されて継承されるので、
 			 * ここで指定し直す（redeclare-colors-with-color-scheme）
@@ -214,7 +303,8 @@ const { title } = Astro.props
 			 * 縦に並べる形では、最初のスライドの枠を、画面の上の端からセーフエリアの分だけ下げる（DESIGN.md の「画面の端」）。
 			 * いつもの余白は 0 で、セーフエリアと比べる（safe-area-combine-with-max）。
 			 * 枠の外の面は文書のルートと同じ色なので、デッキの内側の余白で空けても、色が途切れた帯はできない。
-			 * 最後のスライドの下は、ノートの面を画面の端まで塗るため、Slide.astro の側で空ける
+			 * 最後のスライドの下は、ノートの面を画面の端まで塗るため、Slide.astro の側で空ける。
+			 * 操作の部分を出しているときに空ける長さは、上の規則でこの .deck で宣言し、継承で渡す。どのスライドで使うかは Slide.astro が決める
 			 */
 			&:not([data-view]) {
 				padding-block-start: max(0px, env(safe-area-inset-top));

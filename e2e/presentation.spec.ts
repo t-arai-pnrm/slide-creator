@@ -168,6 +168,27 @@ const expectHoverAcrossBandGaps = async (page: Page, band: Locator) => {
 	return points
 }
 
+/**
+ * 縦に並べた形で、スクリプトが今のスライドを測るまで待つ。測るのは次の描画の前（requestAnimationFrame）なので、
+ * 2 回描画を待てば、その前に起きたスクロールと大きさの変化の分は測り終えている
+ */
+const waitForScrollSync = (page: Page) =>
+	page.evaluate(
+		() =>
+			new Promise<void>((resolve) => {
+				requestAnimationFrame(() => {
+					requestAnimationFrame(() => {
+						resolve()
+					})
+				})
+			}),
+	)
+
+const scrollToBottom = (page: Page) =>
+	page.evaluate(() => {
+		window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' })
+	})
+
 test.describe('横長の画面', () => {
 	test.use({ viewport: LANDSCAPE })
 
@@ -178,6 +199,8 @@ test.describe('横長の画面', () => {
 		await expect(controls(page)).toBeVisible()
 		await expect(controls(page).locator('._position')).toHaveText(`スライド 1 / ${TOTAL}`)
 		await expect(deck(page)).toHaveCSS('--deck-controls--progress', String(1 / TOTAL))
+		// 帯の分のスクロールの余白は、縦に並べて読む形だけに付ける
+		await expect(page.locator('html')).toHaveCSS('scroll-padding-block-end', 'auto')
 	})
 
 	test('今のスライドだけが見える', async ({ page }) => {
@@ -586,31 +609,345 @@ test.describe('画面の向きが変わったとき', () => {
 
 		await page.setViewportSize(PORTRAIT)
 		await expect(deck(page)).not.toHaveAttribute('data-view')
-		await expect(controls(page)).toBeHidden()
+		await expect(controls(page)).toBeVisible()
 		await expect(page.locator('main.deck > section.slide[hidden]')).toHaveCount(0)
 
 		await page.setViewportSize(LANDSCAPE)
 		await expect(deck(page)).toHaveAttribute('data-view', 'present')
 		await expectCurrent(page, 3)
 	})
+
+	// 縦長の画面（375×812）では、最後の 2、3 枚は、枠の上端を画面の上の端まで動かせず、どれもページの下の端の位置に寄る
+	for (const pageNumber of [TOTAL - 1, TOTAL]) {
+		test(`${pageNumber} 枚目で縦長にしてから横長に戻すと、同じスライドに戻る`, async ({ page }) => {
+			await page.goto(`${DECK_PATH}#${pageNumber}`)
+			await expectCurrent(page, pageNumber)
+
+			await page.setViewportSize(PORTRAIT)
+			await expect(deck(page)).not.toHaveAttribute('data-view')
+			await waitForScrollSync(page)
+			// 枠の上端を画面の上の端まで動かせない（下の端に寄せた）スライドで試していることを確かめる
+			expect(
+				(
+					await slides(page)
+						.nth(pageNumber - 1)
+						.locator(':scope > ._frame')
+						.boundingBox()
+				)?.y,
+			).toBeGreaterThan(1)
+			await expect(controls(page).locator('[data-deck-current]')).toHaveText(String(pageNumber))
+
+			await page.setViewportSize(LANDSCAPE)
+			await expectCurrent(page, pageNumber)
+		})
+	}
+
+	test('すべてのスライドが 1 画面に収まるときも、縦長にしてから横長に戻すと、同じスライドに戻る', async ({ page }) => {
+		await page.goto(`${DECK_PATH}#3`)
+		await expectCurrent(page, 3)
+
+		// 縦長のまま、すべてのスライドとノートが収まる高さにする
+		await page.setViewportSize({ width: PORTRAIT.width, height: 20_000 })
+		await expect(deck(page)).not.toHaveAttribute('data-view')
+		const maxScroll = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight)
+		expect(maxScroll).toBeLessThanOrEqual(0)
+		await waitForScrollSync(page)
+		await expect(controls(page).locator('[data-deck-current]')).toHaveText('3')
+
+		await page.setViewportSize(LANDSCAPE)
+		await expectCurrent(page, 3)
+	})
+
+	test('縦に並べた形でいちばん下までスクロールしてから横長にすると、最後のスライドから始まる', async ({ page }) => {
+		await page.setViewportSize(PORTRAIT)
+		await page.goto(DECK_PATH)
+		await scrollToBottom(page)
+		await expect(controls(page).locator('[data-deck-current]')).toHaveText(String(TOTAL))
+
+		await page.setViewportSize(LANDSCAPE)
+		await expectCurrent(page, TOTAL)
+	})
+
+	test('ノートの状態は、発表の表示と縦に並べた形で別々に持つ', async ({ page }) => {
+		await page.goto(DECK_PATH)
+		const button = controlButton(page, 'ノート')
+		await page.keyboard.press('n')
+		await expect(deck(page)).toHaveAttribute('data-notes', 'shown')
+
+		// 縦に並べた形は、発表の表示の状態を持ち込まず、初期値（出す）から始める
+		await page.setViewportSize(PORTRAIT)
+		await expect(deck(page)).toHaveAttribute('data-notes', 'shown')
+		await expect(button).toHaveAttribute('aria-pressed', 'true')
+		await button.dispatchEvent('click')
+		await expect(deck(page)).toHaveAttribute('data-notes', 'hidden')
+		await expect(button).toHaveAttribute('aria-pressed', 'false')
+
+		await page.setViewportSize(LANDSCAPE)
+		await expect(deck(page)).toHaveAttribute('data-notes', 'shown')
+		await expect(button).toHaveAttribute('aria-pressed', 'true')
+		await page.keyboard.press('n')
+		await expect(deck(page)).toHaveAttribute('data-notes', 'hidden')
+
+		await page.setViewportSize(PORTRAIT)
+		await expect(deck(page)).toHaveAttribute('data-notes', 'hidden')
+		await expect(button).toHaveAttribute('aria-pressed', 'false')
+	})
+
+	test('発表の表示で付いた data-idle は、縦長にすると外れ、その後も付かない', async ({ page }) => {
+		await page.clock.install()
+		await page.goto(DECK_PATH)
+		await page.mouse.move(10, 10)
+		await page.clock.runFor(IDLE_DELAY_MS + 100)
+		await expect(controls(page)).toHaveAttribute('data-idle')
+
+		await page.setViewportSize(PORTRAIT)
+		await expect(controls(page)).not.toHaveAttribute('data-idle')
+		await page.mouse.move(20, 20)
+		await page.clock.runFor(IDLE_DELAY_MS * 2)
+		await expect(controls(page)).not.toHaveAttribute('data-idle')
+
+		// 横長に戻せば、また薄くする
+		await page.setViewportSize(LANDSCAPE)
+		await page.clock.runFor(IDLE_DELAY_MS + 100)
+		await expect(controls(page)).toHaveAttribute('data-idle')
+	})
 })
 
-/** 縦に並べた形のままで、操作の部分が出ていないことを確かめる */
+/** 縦に並べた形のままで、すべてのスライドが出ていることを確かめる */
 const expectScrollView = async (page: Page) => {
 	await expect(deck(page)).not.toHaveAttribute('data-view')
-	await expect(controls(page)).toBeHidden()
 	await expect(page.locator('.presenter-timer')).toBeHidden()
 	await expect(slides(page)).toHaveCount(TOTAL)
 	await expect(page.locator('main.deck > section.slide:is([hidden], [inert], [data-slide])')).toHaveCount(0)
 	await expect(slides(page).last()).toBeVisible()
 }
 
+const slideFrame = (page: Page, pageNumber: number) =>
+	slides(page)
+		.nth(pageNumber - 1)
+		.locator(':scope > ._frame')
+
+/** page 枚目（1 から数える）のスライドの枠の上端が、画面の上の端にあることを確かめる */
+const expectFrameAtTop = async (page: Page, pageNumber: number, tolerance = 1) => {
+	// 枠の位置は小数になりうるので、tolerance 未満のずれは画面の上の端とみなす
+	await expect
+		.poll(async () => Math.abs((await slideFrame(page, pageNumber).boundingBox())?.y ?? Number.NaN))
+		.toBeLessThan(tolerance)
+}
+
+const scrollY = (page: Page) => page.evaluate(() => window.scrollY)
+
+/**
+ * 縦に並べた形のボタンは、dispatchEvent で押す。click() は押す前にボタンを画面に入れようとスクロールするので、
+ * 帯の置き場所によって、確かめたいスクロールの位置が変わってしまう。帯の置き場所は別のテストで確かめる
+ */
+const pressInScrollView = (page: Page, name: string) => controlButton(page, name).dispatchEvent('click')
+
 test.describe('縦長の画面', () => {
 	test.use({ viewport: PORTRAIT })
 
-	test('縦に並べた形のままで、操作の部分が出ない', async ({ page }) => {
+	test('縦に並べた形のままで、操作の部分が出る', async ({ page }) => {
 		await page.goto(`${DECK_PATH}#2`)
 		await expectScrollView(page)
+		await expect(controls(page)).toBeVisible()
+	})
+
+	test('操作の部分には、前へ、次へ、ノート、ダークの 4 つのボタンだけを出す', async ({ page }) => {
+		await page.goto(DECK_PATH)
+		const visibleNames = await controls(page)
+			.locator('button')
+			.evaluateAll((buttons) =>
+				buttons
+					.filter((button) => button.getClientRects().length > 0)
+					.map((button) => button.querySelector('.-visually-hidden')?.textContent ?? ''),
+			)
+		expect(visibleNames).toEqual(['前へ', '次へ', 'ノート', 'ダーク'])
+	})
+
+	test('操作の部分は、画面の下の端から 1rem 離して、中央に置く', async ({ page }) => {
+		await page.goto(DECK_PATH)
+		const band = await controls(page).boundingBox()
+		expect(band).not.toBeNull()
+		if (!band) return
+		const rem = await page.evaluate(() => Number.parseFloat(getComputedStyle(document.documentElement).fontSize))
+		// セーフエリア（env(safe-area-inset-bottom)）は Playwright では 0 なので、1rem だけが残る
+		expect(band.y + band.height).toBeCloseTo(PORTRAIT.height - rem, 0)
+		expect(band.x + band.width / 2).toBeCloseTo(PORTRAIT.width / 2, 0)
+		// 帯の幅は中身の幅にし、画面の幅に広げない
+		expect(band.width).toBeLessThan(PORTRAIT.width)
+	})
+
+	test('マウスを止めても、操作の部分に data-idle を付けない', async ({ page }) => {
+		await page.clock.install()
+		await page.goto(DECK_PATH)
+		await page.mouse.move(100, 100)
+		await page.clock.runFor(IDLE_DELAY_MS * 2)
+		await expect(controls(page)).not.toHaveAttribute('data-idle')
+	})
+
+	test('前へと次へで、前と次のスライドの枠の上端まで画面を動かし、端では aria-disabled にする', async ({ page }) => {
+		await page.goto(DECK_PATH)
+		await expect(controlButton(page, '前へ')).toHaveAttribute('aria-disabled', 'true')
+		await expect(controlButton(page, '次へ')).toHaveAttribute('aria-disabled', 'false')
+
+		await pressInScrollView(page, '次へ')
+		await expectFrameAtTop(page, 2)
+		await expect(controlButton(page, '前へ')).toHaveAttribute('aria-disabled', 'false')
+		await pressInScrollView(page, '次へ')
+		await expectFrameAtTop(page, 3)
+		await expect(controls(page).locator('[data-deck-current]')).toHaveText('3')
+		await pressInScrollView(page, '前へ')
+		await expectFrameAtTop(page, 2)
+		// 縦に並べた形では、ハッシュを書き換えない
+		await expect(page).toHaveURL(/\/$/)
+	})
+
+	test('スクロールすると、今のスライドと前へ、次へのボタンの状態が変わる', async ({ page }) => {
+		await page.goto(DECK_PATH)
+		await slideFrame(page, 4).evaluate((element) => {
+			window.scrollTo({ top: element.getBoundingClientRect().top + window.scrollY, behavior: 'instant' })
+		})
+		await expect(controls(page).locator('[data-deck-current]')).toHaveText('4')
+		await expect(controlButton(page, '前へ')).toHaveAttribute('aria-disabled', 'false')
+
+		// いちばん下までスクロールすると、それより先へは動かせないので、次へを押せない
+		await scrollToBottom(page)
+		await expect(controlButton(page, '次へ')).toHaveAttribute('aria-disabled', 'true')
+		const bottom = await scrollY(page)
+		await pressInScrollView(page, '次へ')
+		expect(await scrollY(page)).toBe(bottom)
+
+		// 前へで上へ動かすと、また次へを押せる
+		await pressInScrollView(page, '前へ')
+		await expect.poll(() => scrollY(page)).toBeLessThan(bottom)
+		await expect(controlButton(page, '次へ')).toHaveAttribute('aria-disabled', 'false')
+	})
+
+	test('いちばん下までスクロールすると、今のスライドを最後のスライドにし、進み具合と読み上げの位置も最後にする', async ({
+		page,
+	}) => {
+		await page.goto(DECK_PATH)
+		await scrollToBottom(page)
+		await expect(controls(page).locator('[data-deck-current]')).toHaveText(String(TOTAL))
+		await expect(deck(page)).toHaveCSS('--deck-controls--progress', '1')
+		await expect(controlButton(page, '次へ')).toHaveAttribute('aria-disabled', 'true')
+		await expect(controlButton(page, '前へ')).toHaveAttribute('aria-disabled', 'false')
+
+		// 前へは、下の端に寄せたスライドを飛ばし、画面を動かせる前のスライドの枠の上端まで動かす
+		const bottom = await scrollY(page)
+		await pressInScrollView(page, '前へ')
+		await expect.poll(() => scrollY(page)).toBeLessThan(bottom)
+		await waitForScrollSync(page)
+		const current = Number(await controls(page).locator('[data-deck-current]').textContent())
+		expect(current).toBeLessThan(TOTAL)
+		await expectFrameAtTop(page, current)
+	})
+
+	test('いちばん下までスクロールしたとき、最後のスライドの中身とノートが操作の部分に重ならない', async ({ page }) => {
+		await page.goto(DECK_PATH)
+		await scrollToBottom(page)
+		await expect(controlButton(page, '次へ')).toHaveAttribute('aria-disabled', 'true')
+		const band = await controls(page).boundingBox()
+		// ノートの面は画面の下の端まで塗るので、帯の下に入ってよい。重なってはいけないのは、ノートの文字の入る内容の領域
+		const last = await slides(page)
+			.last()
+			.evaluate((slide) => {
+				const bottoms = [...slide.querySelectorAll(':scope > ._frame, :scope > aside')].map((element) => {
+					const style = getComputedStyle(element)
+					const contentEnd = element.matches('aside')
+						? Number.parseFloat(style.paddingBottom) + Number.parseFloat(style.borderBottomWidth)
+						: 0
+					return element.getBoundingClientRect().bottom - contentEnd
+				})
+				return Math.max(...bottoms)
+			})
+		expect(band).not.toBeNull()
+		if (!band) return
+		// 帯の高さは rem と細い線の和で、画面の画素に丸めると 1px 未満ずれうる
+		expect(last).toBeLessThanOrEqual(band.y + 0.5)
+	})
+
+	test('ノートを隠したときも、いちばん下までスクロールしたとき、最後のスライドの中身が操作の部分に重ならない', async ({
+		page,
+	}) => {
+		await page.goto(DECK_PATH)
+		await pressInScrollView(page, 'ノート')
+		await expect(deck(page)).toHaveAttribute('data-notes', 'hidden')
+		await expect(slides(page).last().locator(':scope > aside')).toBeHidden()
+		await scrollToBottom(page)
+		await expect(controlButton(page, '次へ')).toHaveAttribute('aria-disabled', 'true')
+		const band = await controls(page).boundingBox()
+		const frame = await slides(page).last().locator(':scope > ._frame').boundingBox()
+		expect(band).not.toBeNull()
+		expect(frame).not.toBeNull()
+		if (!band || !frame) return
+		// 帯の高さは rem と細い線の和で、画面の画素に丸めると 1px 未満ずれうる
+		expect(frame.y + frame.height).toBeLessThanOrEqual(band.y + 0.5)
+	})
+
+	test('ルートのスクロールの下の余白を、画面の下の端から帯の上端までの長さにする', async ({ page }) => {
+		await page.goto(DECK_PATH)
+		const band = await controls(page).boundingBox()
+		expect(band).not.toBeNull()
+		if (!band) return
+		const padding = Number.parseFloat(
+			await page.evaluate(() => getComputedStyle(document.documentElement).scrollPaddingBlockEnd),
+		)
+		expect(padding).toBeGreaterThan(0)
+		// 帯の高さは rem と細い線の和で、画面の画素に丸めると 1px 未満ずれうる
+		expect(Math.abs(padding - (PORTRAIT.height - band.y))).toBeLessThan(1)
+	})
+
+	test('ノートのボタンで、すべてのノートを隠して出し、aria-pressed が変わる', async ({ page }) => {
+		await page.goto(DECK_PATH)
+		const button = controlButton(page, 'ノート')
+		const notes = page.locator('main.deck > section.slide > aside')
+		await expect(deck(page)).toHaveAttribute('data-notes', 'shown')
+		await expect(button).toHaveAttribute('aria-pressed', 'true')
+		await expect(notes.first()).toBeVisible()
+
+		await pressInScrollView(page, 'ノート')
+		await expect(deck(page)).toHaveAttribute('data-notes', 'hidden')
+		await expect(button).toHaveAttribute('aria-pressed', 'false')
+		const all = await notes.all()
+		await Promise.all(all.map((element) => expect(element).toBeHidden()))
+
+		await pressInScrollView(page, 'ノート')
+		await expect(deck(page)).toHaveAttribute('data-notes', 'shown')
+		await expect(button).toHaveAttribute('aria-pressed', 'true')
+		await expect(notes.first()).toBeVisible()
+	})
+
+	test('ノートを切り替えても、読んでいたスライドの枠は画面の上の端に残る', async ({ page }) => {
+		await page.goto(DECK_PATH)
+		await pressInScrollView(page, '次へ')
+		await pressInScrollView(page, '次へ')
+		await expectFrameAtTop(page, 3)
+		// WebKit では、切り替えた後の枠が 1.7px ほどずれた。スクロールの位置の丸めの誤差とみて、2px 未満を許す
+		await pressInScrollView(page, 'ノート')
+		await expect(deck(page)).toHaveAttribute('data-notes', 'hidden')
+		await expectFrameAtTop(page, 3, 2)
+		await pressInScrollView(page, 'ノート')
+		await expectFrameAtTop(page, 3, 2)
+	})
+
+	test('印刷の間は操作の部分を隠して data-notes を外し、ノートは紙に出さず、印刷の後に元に戻す', async ({ page }) => {
+		await page.goto(DECK_PATH)
+		await pressInScrollView(page, 'ノート')
+		await expect(deck(page)).toHaveAttribute('data-notes', 'hidden')
+
+		await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')))
+		await expect(controls(page)).toBeHidden()
+		await expect(deck(page)).not.toHaveAttribute('data-notes')
+		// ノートは、data-notes にかかわらず、印刷のメディアでは CSS で隠れる
+		await page.emulateMedia({ media: 'print' })
+		await expect(page.locator('main.deck > section.slide > aside').first()).toBeHidden()
+		await page.emulateMedia({ media: 'screen' })
+
+		await page.evaluate(() => window.dispatchEvent(new Event('afterprint')))
+		await expect(controls(page)).toBeVisible()
+		await expect(deck(page)).toHaveAttribute('data-notes', 'hidden')
+		await expect(controlButton(page, 'ノート')).toHaveAttribute('aria-pressed', 'false')
 	})
 
 	test('ノートは Tab の止まる場所にしない', async ({ page }) => {
@@ -659,23 +996,82 @@ test.describe('縦長の画面', () => {
 		await expect(slides(page).nth(2)).not.toBeInViewport()
 	})
 
-	test('キーでスライドを移さず、ハッシュも書き換えない', async ({ page }) => {
+	test('← → で前と次のスライドの枠まで画面を動かし、N でノート、D でダークを切り替え、ハッシュは書き換えない', async ({
+		page,
+	}) => {
 		await page.goto(DECK_PATH)
 		await page.keyboard.press('ArrowRight')
+		await expectFrameAtTop(page, 2)
+		await page.keyboard.press('ArrowRight')
+		await expectFrameAtTop(page, 3)
+		await expect(controls(page).locator('[data-deck-current]')).toHaveText('3')
+		await page.keyboard.press('ArrowLeft')
+		await expectFrameAtTop(page, 2)
+
 		await page.keyboard.press('n')
+		await expect(deck(page)).toHaveAttribute('data-notes', 'hidden')
+		await expect(controlButton(page, 'ノート')).toHaveAttribute('aria-pressed', 'false')
+		await page.keyboard.press('d')
+		await expect(colorScheme(page)).toHaveAttribute('content', 'dark only')
 		await expect(page).toHaveURL(/\/$/)
-		await expect(deck(page)).not.toHaveAttribute('data-notes')
 	})
-})
 
-test.describe('JavaScript が動かない環境（横長の画面）', () => {
-	test.use({ viewport: LANDSCAPE, javaScriptEnabled: false })
-
-	test('縦に並べた形のままで、操作の部分が出ない', async ({ page }) => {
+	test('スペース、Page Up / Page Down、上下の矢印、Home / End、F、P は、ブラウザに残す', async ({ page }) => {
 		await page.goto(DECK_PATH)
-		await expectScrollView(page)
+		// デッキの処理（document）の後に呼ばれる window で、既定の動作（スクロール）を止めたかを記録する
+		await page.evaluate(() => {
+			const prevented: string[] = []
+			Object.assign(window, { prevented })
+			window.addEventListener('keydown', (event) => {
+				if (event.defaultPrevented) prevented.push(event.key)
+			})
+		})
+		for (const key of ['Space', 'Shift+Space', 'PageDown', 'PageUp', 'ArrowDown', 'ArrowUp', 'End', 'Home', 'f', 'p']) {
+			// キーは順に押す
+			// oxlint-disable-next-line no-await-in-loop
+			await page.keyboard.press(key)
+		}
+		expect(await page.evaluate(() => Reflect.get(window, 'prevented'))).toEqual([])
+		await expect(page).toHaveURL(/\/$/)
+	})
+
+	test('前へと次への aria-keyshortcuts は左右の矢印だけにし、横長に戻すと元に戻す', async ({ page }) => {
+		await page.goto(DECK_PATH)
+		await expect(controlButton(page, '前へ')).toHaveAttribute('aria-keyshortcuts', 'ArrowLeft')
+		await expect(controlButton(page, '次へ')).toHaveAttribute('aria-keyshortcuts', 'ArrowRight')
+		await expect(controlButton(page, 'ノート')).toHaveAttribute('aria-keyshortcuts', 'N')
+		await expect(controlButton(page, 'ダーク')).toHaveAttribute('aria-keyshortcuts', 'D')
+		// ツールチップは、縦に並べた形でも効くキーだけを見せる
+		await expect(controlButton(page, '前へ').locator('._tooltip kbd')).toHaveText('←')
+		await expect(controlButton(page, '次へ').locator('._tooltip kbd')).toHaveText('→')
+
+		await page.setViewportSize(LANDSCAPE)
+		await expect(deck(page)).toHaveAttribute('data-view', 'present')
+		await expect(controlButton(page, '前へ')).toHaveAttribute('aria-keyshortcuts', 'ArrowLeft PageUp Shift+Space')
+		await expect(controlButton(page, '次へ')).toHaveAttribute('aria-keyshortcuts', 'ArrowRight PageDown Space')
 	})
 })
+
+for (const viewport of [LANDSCAPE, PORTRAIT]) {
+	test.describe(`JavaScript が動かない環境（${viewport.width}×${viewport.height}）`, () => {
+		test.use({ viewport, javaScriptEnabled: false })
+
+		test('縦に並べた形のままで、操作の部分が出ず、data-notes を付けない', async ({ page }) => {
+			await page.goto(DECK_PATH)
+			await expectScrollView(page)
+			await expect(controls(page)).toBeHidden()
+			await expect(deck(page)).not.toHaveAttribute('data-notes')
+		})
+
+		// ノートは縦長の画面でだけ出す（DESIGN.md の「枠」）。ノートを隠すボタンが使えないので、隠さずに出す
+		if (viewport.height > viewport.width) {
+			test('ノートが出る', async ({ page }) => {
+				await page.goto(DECK_PATH)
+				await expect(page.locator('main.deck > section.slide > aside').first()).toBeVisible()
+			})
+		}
+	})
+}
 
 test.describe('発表者ビュー', () => {
 	test.use({ viewport: LANDSCAPE })
@@ -795,6 +1191,8 @@ test.describe('発表者ビュー', () => {
 		await page.setViewportSize(PORTRAIT)
 		await page.goto(`${DECK_PATH}?presenter`)
 		await expect(deck(page)).toHaveAttribute('data-view', 'presenter')
+		// 帯の分のスクロールの余白は、縦に並べて読む形だけに付ける
+		await expect(page.locator('html')).toHaveCSS('scroll-padding-block-end', 'auto')
 	})
 
 	test('開いたときは止まっていて、再生で数え、一時停止は値を残し、停止で 0 に戻す', async ({ page }) => {
